@@ -58,6 +58,24 @@ class StoreTests(unittest.TestCase):
                 "test-key-bounded-01",
             )
 
+    def test_requester_cannot_approve_own_run(self):
+        result, _ = self.store.create_run(
+            self.operator, {"order_ids": ["FS-10421"], "mode": "recommend"},
+            "test-key-approval-01",
+        )
+        approval = self.store.list_approvals()[0]
+        with self.assertRaises(Conflict):
+            self.store.decide(
+                self.operator, approval["id"],
+                {"decision": "approve", "note": "Approve the recommended plan"},
+            )
+        approver = {"id": "approver@example.com", "role": "approver"}
+        decision = self.store.decide(
+            approver, approval["id"],
+            {"decision": "approve", "note": "Independent review completed"},
+        )
+        self.assertEqual("Approved", decision["status"])
+
 
 if __name__ == "__main__":
     unittest.main()

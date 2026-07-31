@@ -22,9 +22,9 @@ Operator and approver groups should not overlap in the controlled pilot.
 a managed private PostgreSQL instance with encryption, point-in-time recovery,
 automated backups, and separate application/migration identities.
 
-The current Python runtime remains on SQLite until the PostgreSQL adapter is
-implemented and exercised in CI. This is deliberate: configuration must not
-silently claim PostgreSQL while writing elsewhere.
+The runtime selects the PostgreSQL adapter when `DATABASE_URL` is set. Run
+`server/test_postgres_contract.py` with `OVERSEER_TEST_POSTGRES_URL` in CI.
+SQLite remains the zero-dependency local fallback.
 
 ## Pilot mode
 

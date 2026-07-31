@@ -19,6 +19,10 @@ fulfillment system.
 - A server-side bounded-execution kill switch that fails closed.
 - Liveness and readiness endpoints with correlation IDs.
 - A PostgreSQL schema contract and pilot operations package.
+- A working PostgreSQL runtime adapter selected by `DATABASE_URL`.
+- A governed-mode interface showing identity, permissions, readiness, controls,
+  persistent orders, approvals, and audit history.
+- Independent approval enforcement: a requester cannot approve their own run.
 
 ## Run the internal sandbox
 
@@ -32,6 +36,9 @@ python server/overseer_server.py
 Open `http://127.0.0.1:8080`. The database is created at
 `server/data/overseer.db`. Development mode defaults to a local admin identity
 and must never be used on a shared network.
+
+Open **Enterprise status** in the left navigation to see the connection,
+identity, permissions, audit integrity, and execution kill switch visually.
 
 Check the governed service:
 
@@ -71,10 +78,11 @@ provider, and inject verified values. Never expose the service directly.
 
 ## Still required before a company pilot
 
-1. Implement and test the PostgreSQL runtime adapter against the included
-   schema contract.
+1. Exercise the PostgreSQL integration test against the company's managed
+   database and add migrations to its deployment pipeline.
 2. Deploy behind the company's identity-aware proxy and secrets manager.
-3. Add CSRF protection when browser writes are wired to the API.
+3. Replace the development approval prompt with a structured decision form and
+   add CSRF protection for cookie-authenticated deployments.
 4. Connect a read-only staging adapter for OMS, WMS, inventory, and carrier
    data; validate schemas and replay behavior.
 5. Add metrics, traces, alerts, backups, restore tests, and an incident runbook.
@@ -82,6 +90,20 @@ provider, and inject verified values. Never expose the service directly.
 7. Run threat modeling, privacy review, accessibility testing, load testing,
    and disaster-recovery exercises.
 8. Complete shadow-mode comparison before permitting bounded writes.
+
+## PostgreSQL runtime
+
+Install the adapter and set the database URL:
+
+```powershell
+pip install -r server/requirements.txt
+$env:DATABASE_URL = "postgresql://overseer:password@localhost:5432/overseer"
+$env:OVERSEER_DEV_MODE = "1"
+python server/overseer_server.py
+```
+
+When `DATABASE_URL` starts with `postgresql://`, the service initializes and
+uses PostgreSQL. Without it, local development continues to use SQLite.
 
 ## Recommended release gates
 

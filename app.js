@@ -187,8 +187,18 @@ function renderApprovals(){
   el.innerHTML=state.approvals.map(a=>`<article class="approval-card" data-approval="${a.id}"><div><p class="eyebrow">YOUR DECISION · COST LIMIT EXCEEDED</p><h2>${a.id} · ${escapeHtml(a.merchant)}</h2><p>Ground service misses the promised date. Air is the only option above your required delivery confidence.</p><div class="approval-facts"><div><span>Recommended plan</span><b>${a.plan}</b></div><div><span>Expected cost</span><b>${a.cost}</b></div><div><span>Delivery confidence</span><b>${a.confidence}</b></div></div></div><div class="approval-actions"><button class="reject" data-decision="reject">Pause order</button><button class="approve" data-decision="approve">Approve & continue</button></div></article>`).join("");
   $$("[data-decision]").forEach(btn=>btn.addEventListener("click",()=>decideApproval(btn.closest("[data-approval]").dataset.approval,btn.dataset.decision)));
 }
-function decideApproval(id,decision){
+async function decideApproval(id,decision){
   const approval=state.approvals.find(a=>a.id===id), order=state.orders.find(o=>o.id===id);
+  if(enterprise?.connected&&approval?.approvalId){
+    const note=prompt(`Explain why you ${decision==="approve"?"approve":"reject"} this recommendation:`);
+    if(!note)return;
+    try{
+      await apiPost(`/api/approvals/${encodeURIComponent(approval.approvalId)}/decision`,{decision,note});
+      toast(`${id} ${decision==="approve"?"approved":"rejected"} with an audited decision`);
+      await refreshEnterprise();
+    }catch(error){toast(error.message||"The governed service rejected this decision");}
+    return;
+  }
   if(decision==="approve"){order.status="Released";order.decision="Human approved";order.allocation="YVR1";order.carrier="FedEx Priority";audit("Human approval committed",`${id} recommendation v1 revalidated and allowed to continue by Alex Ortega.`,"approval.approved");toast(`${id} approved and ready to fulfill`);}
   else {order.status="Held";order.decision="Paused by overseer";audit("Order paused",`${id} retained without operational mutation.`,"approval.held");toast(`${id} paused for follow-up`);}
   state.approvals=state.approvals.filter(a=>a.id!==id);updateCounts();renderApprovals();renderOrders();
@@ -405,3 +415,72 @@ $("#tour-dialog").addEventListener("close",()=>{if($("#tour-dialog").returnValue
 $$("[data-recovery]").forEach(b=>b.addEventListener("click",()=>{audit("Recovery workflow started","FS-10421 disruption reassessed against remaining customer promise.","goal.delivery_recovery_started");navigate("audit");toast("Delivery recovery workflow started");}));
 renderAll();
 applyTheme(localStorage.getItem("overseer-theme")||"light");
+
+/* Governed-service integration. GitHub Pages falls back to demo mode. */
+const enterprise = {connected:false,session:null,readiness:null,controls:null,approvals:[]};
+async function apiGet(path){
+  const response=await fetch(path,{headers:{"Accept":"application/json"}});
+  const type=response.headers.get("content-type")||"";
+  if(!response.ok||!type.includes("application/json"))throw new Error("Governed service unavailable");
+  return response.json();
+}
+async function apiPost(path,body){
+  const response=await fetch(path,{method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await response.json().catch(()=>({error:"Invalid service response"}));
+  if(!response.ok)throw new Error(data.error||"Governed request failed");
+  return data;
+}
+function renderEnterprise(){
+  const root=$("#enterprise-status");
+  if(!root)return;
+  if(!enterprise.connected){
+    root.innerHTML=`<section class="enterprise-hero"><span class="backend-indicator demo"></span><div><p>CONNECTION</p><h2>Public demonstration mode</h2><span>No private backend is connected. Run the Python service and open http://127.0.0.1:8080 to enter governed mode.</span></div></section>
+      <div class="enterprise-callout"><b>Your public website is working normally.</b>Demo actions use controlled sample data and do not write to a company database.</div>`;
+    return;
+  }
+  const actor=enterprise.session.actor, caps=enterprise.session.capabilities;
+  const checks=enterprise.readiness.checks;
+  const control=enterprise.controls.controls.bounded_execution;
+  root.innerHTML=`<section class="enterprise-hero"><span class="backend-indicator live"></span><div><p>CONNECTION</p><h2>Governed service connected</h2><span>Persistent records, verified identity, server permissions, and audit controls are active.</span></div></section>
+    <div class="enterprise-grid">
+      <article class="enterprise-tile"><span>SIGNED IN AS</span><b>${escapeHtml(actor.id)}</b><small>Identity mode: ${escapeHtml(actor.mode)}</small></article>
+      <article class="enterprise-tile"><span>SERVER ROLE</span><b>${escapeHtml(actor.role)}</b><small>${caps.execute?"Can request runs":"Read only"} · ${caps.approve?"Can approve":"Cannot approve"}</small></article>
+      <article class="enterprise-tile"><span>EXECUTION CONTROL</span><b>${escapeHtml(control.value)}</b><small>Bounded writes fail closed when disabled</small></article>
+      <article class="enterprise-tile"><span>PENDING DECISIONS</span><b>${enterprise.approvals.length}</b><small>Independent approval required</small></article>
+    </div>
+    <section class="enterprise-panel"><h2>Runtime readiness</h2>
+      <div class="enterprise-check"><i></i><b>Database</b><span>${escapeHtml(checks.database)} · persistent operational records</span></div>
+      <div class="enterprise-check"><i></i><b>Audit chain</b><span>${escapeHtml(checks.audit_chain)} · tamper-evident history verified</span></div>
+      <div class="enterprise-check"><i></i><b>Identity boundary</b><span>${escapeHtml(checks.identity)} · role enforced by the service</span></div>
+      <div class="enterprise-check"><i class="${control.value==="disabled"?"":"warn"}"></i><b>Bounded execution</b><span>${escapeHtml(control.value)} · ${control.value==="disabled"?"safe shadow/recommend modes only":"LIVE WRITES PERMITTED"}</span></div>
+    </section>
+    <div class="enterprise-callout"><b>${actor.mode==="development"?"Local development identity":"Company identity verified"}</b>${actor.mode==="development"?"Use an OIDC identity proxy before sharing this service with other users.":"Identity claims were supplied by the trusted authentication boundary."}</div>`;
+}
+async function refreshEnterprise(){
+  try{
+    const [session,readiness,controls,orders,approvals,auditData]=await Promise.all([
+      apiGet("/api/session"),apiGet("/api/readiness"),apiGet("/api/controls"),
+      apiGet("/api/orders"),apiGet("/api/approvals"),apiGet("/api/audit")
+    ]);
+    Object.assign(enterprise,{connected:true,session,readiness,controls,approvals:approvals.approvals});
+    orders.orders.forEach(remote=>{
+      const local=state.orders.find(order=>order.id===remote.id);
+      if(local){local.merchant=remote.merchant;local.destination=remote.destination;local.profile=remote.profile;local.status=remote.status;local.decision=`Persistent record v${remote.version}`;}
+    });
+    state.approvals=approvals.approvals.map(item=>({id:item.order_id,approvalId:item.id,merchant:item.merchant,plan:item.reason,cost:"—",confidence:item.escalation}));
+    state.audit=auditData.events.map(event=>({time:event.timestamp.slice(11,23),title:event.action,body:`${event.object_type} ${event.object_id} · ${event.actor}`,code:event.event_id}));
+    $("#service-mode").textContent="Governed mode";
+    $("#service-identity").textContent=`${session.actor.id} · ${session.actor.role}`;
+    $("#service-dot").classList.add("live");
+    $("#profile-button").querySelector("strong").textContent=session.actor.id;
+    $("#profile-button").querySelector("small").textContent=`${session.actor.role} · server verified`;
+    renderAll();renderEnterprise();
+  }catch(error){
+    enterprise.connected=false;
+    $("#service-mode").textContent="Simulation";
+    $("#service-identity").textContent="Toronto · public demo";
+    renderEnterprise();
+  }
+}
+$("#refresh-enterprise")?.addEventListener("click",refreshEnterprise);
+refreshEnterprise();

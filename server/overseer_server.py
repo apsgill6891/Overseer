@@ -17,7 +17,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -58,7 +58,15 @@ def now() -> str:
 
 
 def canonical(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        default=lambda item: item.isoformat().replace("+00:00", "Z")
+        if isinstance(item, datetime) else str(item),
+    )
+
+
+def decoded(value):
+    return json.loads(value) if isinstance(value, str) else value
 
 
 class Store:
@@ -121,7 +129,29 @@ class Store:
             rows = db.execute(
                 "SELECT * FROM audit_events ORDER BY sequence DESC LIMIT ?", (limit,)
             )
-            return [{**dict(row), "details": json.loads(row["details_json"])} for row in rows]
+            return [{**dict(row), "details": decoded(row["details_json"])} for row in rows]
+
+    def list_approvals(self, status: str = "Pending") -> list[dict]:
+        with self.connect() as db:
+            rows = db.execute(
+                """SELECT a.*,r.requested_by,r.created_at,o.merchant
+                   FROM approvals a JOIN execution_runs r ON r.id=a.run_id
+                   JOIN orders o ON o.id=a.order_id
+                   WHERE a.status=? ORDER BY r.created_at""", (status,)
+            ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            created_value = item["created_at"]
+            created = created_value if isinstance(created_value, datetime) else datetime.fromisoformat(
+                created_value.replace("Z", "+00:00")
+            )
+            item["expires_at"] = (
+                created + timedelta(hours=24)
+            ).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+            item["escalation"] = "Overdue" if datetime.now(timezone.utc) > created + timedelta(hours=24) else "Normal"
+            result.append(item)
+        return result
 
     def controls(self) -> dict:
         with self.connect() as db:
@@ -157,7 +187,7 @@ class Store:
                 "actor": row["actor"], "actor_role": row["actor_role"],
                 "action": row["action"], "object_type": row["object_type"],
                 "object_id": row["object_id"],
-                "details": json.loads(row["details_json"]),
+                "details": decoded(row["details_json"]),
                 "previous_hash": row["previous_hash"],
             }
             expected_hash = hashlib.sha256(canonical(event).encode()).hexdigest()
@@ -201,7 +231,7 @@ class Store:
                     existing["request_hash"], request_hash
                 ):
                     raise Conflict("idempotency key was already used for another request")
-                return json.loads(existing["response_json"]), True
+                return decoded(existing["response_json"]), True
             placeholders = ",".join("?" for _ in normalized["order_ids"])
             found = db.execute(
                 f"SELECT id,status FROM orders WHERE id IN ({placeholders})",
@@ -278,6 +308,11 @@ class Store:
                 raise NotFound("approval was not found")
             if approval["status"] != "Pending":
                 raise Conflict("approval was already decided")
+            run = db.execute(
+                "SELECT requested_by FROM execution_runs WHERE id=?", (approval["run_id"],)
+            ).fetchone()
+            if run and run["requested_by"] == actor["id"]:
+                raise Conflict("separation of duties prevents approving your own run")
             decided_at = now()
             status = "Approved" if decision == "approve" else "Rejected"
             order_status = "Ready to fulfill" if decision == "approve" else "Held"
@@ -405,6 +440,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.json(HTTPStatus.OK, {
                     "events": store.list_audit(), "verification": store.verify_audit(),
                 })
+            if method == "GET" and path == "/api/approvals":
+                return self.json(HTTPStatus.OK, {"approvals": store.list_approvals()})
             if method == "GET" and path == "/api/controls":
                 return self.json(HTTPStatus.OK, {"controls": store.controls()})
             if method == "POST" and path == "/api/controls/bounded-execution":
@@ -463,8 +500,21 @@ def main() -> None:
     parser.add_argument("--database", type=Path, default=DEFAULT_DB)
     args = parser.parse_args()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    server.store = Store(args.database)
+    database_url = os.environ.get("DATABASE_URL", "")
+    if database_url.startswith(("postgresql://", "postgres://")):
+        try:
+            from postgres_store import PostgresStore
+        except ImportError as exc:
+            raise SystemExit(
+                "PostgreSQL requires: pip install -r server/requirements.txt"
+            ) from exc
+        server.store = PostgresStore(database_url)
+        storage_name = "PostgreSQL"
+    else:
+        server.store = Store(args.database)
+        storage_name = f"SQLite ({args.database})"
     print(f"PROJECT OVERSEER listening on http://{args.host}:{args.port}")
+    print(f"Storage: {storage_name}")
     print("Set OVERSEER_DEV_MODE=1 for local development authentication.")
     try:
         server.serve_forever()

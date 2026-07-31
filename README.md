@@ -27,6 +27,11 @@ security boundary, and the remaining release gates.
 The Phase 2 PostgreSQL schema and identity/monitoring pilot requirements are in
 [`ops/README.md`](ops/README.md).
 
+When the website is opened through the service, **Enterprise status** displays
+the live backend connection, verified identity and role, readiness, persistent
+records, approvals, audit integrity, and execution safety control. The same
+page clearly reports demonstration mode on GitHub Pages.
+
 ## Demo flow
 
 1. Open **Order Intake**.

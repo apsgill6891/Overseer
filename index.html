@@ -9,7 +9,7 @@
       content="PROJECT OVERSEER — an explainable agentic fulfillment control centre."
     />
     <title>PROJECT OVERSEER · FlowShip Fulfillment</title>
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=10" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to operations</a>
@@ -31,6 +31,7 @@
           <button class="nav-item admin-nav" data-view="goals"><i>◎</i><span>Goal templates<small>Workflow definitions</small></span></button>
           <button class="nav-item admin-nav" data-view="policy"><i>◇</i><span>Rules & limits<small>Admin only</small></span></button>
           <button class="nav-item admin-nav" data-view="audit"><i>≡</i><span>Audit history<small>Auditor / admin</small></span></button>
+          <button class="nav-item admin-nav" data-view="enterprise"><i>●</i><span>Enterprise status<small>Backend & identity</small></span></button>
         </nav>
         <div class="system-card">
           <div><span class="status-dot"></span><strong>All systems nominal</strong></div>
@@ -45,7 +46,7 @@
 
       <div class="workspace">
         <header class="topbar">
-          <div class="context"><span class="status-dot"></span><span>Simulation</span><b>Toronto · 14:32 EDT</b></div>
+          <div class="context"><span class="status-dot" id="service-dot"></span><span id="service-mode">Checking backend…</span><b id="service-identity">Toronto · local demo</b></div>
           <div class="top-actions">
             <button class="theme-toggle" id="theme-toggle" aria-label="Switch to dark mode" title="Switch appearance"><span class="theme-sun">☼</span><span class="theme-moon">◐</span><b>Dark</b></button>
             <button class="icon-button" id="reset-button" title="Reset simulation" aria-label="Reset simulation">↻</button>
@@ -209,6 +210,13 @@
             <div class="page-heading compact"><div><p class="eyebrow">IMMUTABLE HISTORY</p><h1>Audit Centre</h1><p>Structured evidence for every system, agent, policy, and human action.</p></div><span class="verified">◇ LEDGER VERIFIED</span></div>
             <div class="audit-layout"><div class="audit-filters"><button class="active">All events</button><button>Decisions</button><button>Human actions</button><button>State changes</button></div><div class="timeline" id="audit-timeline"></div></div>
           </section>
+
+          <section class="view" data-view-panel="enterprise">
+            <div class="page-heading compact"><div><p class="eyebrow">GOVERNED RUNTIME</p><h1>Enterprise status</h1><p>See whether this browser is connected to the real service, who you are, and which safety controls are active.</p></div><button class="secondary-action" id="refresh-enterprise">Refresh status</button></div>
+            <div id="enterprise-status" class="enterprise-status" aria-live="polite">
+              <section class="enterprise-hero"><span class="backend-indicator checking"></span><div><p>CONNECTION</p><h2>Checking governed service…</h2><span>The public GitHub Pages site automatically remains in demonstration mode.</span></div></section>
+            </div>
+          </section>
         </main>
       </div>
     </div>
@@ -291,6 +299,6 @@
       </form>
     </dialog>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=9"></script>
+    <script src="./app.js?v=10"></script>
   </body>
 </html>

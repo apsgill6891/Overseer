@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: overseer
+      POSTGRES_USER: overseer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - overseer_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U overseer -d overseer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  overseer:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://overseer:${POSTGRES_PASSWORD}@postgres:5432/overseer
+      OVERSEER_PROXY_SECRET: ${OVERSEER_PROXY_SECRET:?set OVERSEER_PROXY_SECRET}
+      OVERSEER_DEV_MODE: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+volumes:
+  overseer_postgres:
