@@ -211,11 +211,42 @@ function taskEvidence(r){
     ["Cost and authority","Plan costs + your limits",r.cost==="—"?"Not calculated — plan stopped":`${r.cost} expected cost · limit $${state.runConfig.costLimit}`,"Did not approve an exception"]
   ].map((t,i)=>({name:t[0],input:t[1],output:t[2],prohibited:t[3],status:pending?"Waiting":r.phase===2&&i>3?"Working":"Finished"}));
 }
+function lifecycleFor(r){
+  const nodes=["Received","Coordinator","Planning","Decision gate","Ready to fulfill","Picking","Packing","Shipped","Delivered"];
+  let active=0;
+  if(r.status==="Running")active=Math.min(3,Math.max(1,r.phase));
+  else if(["Awaiting approval","Held","Recommended"].includes(r.status))active=3;
+  else if(r.status==="Released")active=4;
+  const owner=["System","Orchestration","Goal + task agents","Policy / human","Operations","Warehouse","Warehouse","Carrier","Carrier"];
+  return `<div class="order-lifecycle-scroll"><div class="order-lifecycle">${nodes.map((node,i)=>`${i?'<i aria-hidden="true">→</i>':''}<div class="lifecycle-node ${i<active?"complete":i===active?"active":"future"}"><span>${i<active?"✓":i+1}</span><b>${node}</b><small>${owner[i]}</small></div>`).join("")}</div><div class="exception-branch"><span>↳ Exception path</span><b>Delivery problem</b><i>→</i><b>Coordinator replans</b><small>Only used when new evidence makes the original plan infeasible</small></div></div>`;
+}
+function interventionFor(r){
+  if(r.status==="Running"){
+    const working=["Preparing the run","Fulfillment Coordinator · orchestration agent","Specialist team · task agents","Policy and authority control"][r.phase]||"Agent team";
+    return {tone:"info",title:"No help needed yet",owner:working,why:"The required evidence sequence is still running. No decision has been made.",actions:[["Keep watching","watch"]]};
+  }
+  if(r.status==="Awaiting approval"){
+    return {tone:"warning",title:"Your approval is required",owner:"Policy and authority control stopped automatic execution",why:r.reason,actions:[["Review and approve","approval"],["Compare alternatives","alternatives"],["Pause this order","pause"]]};
+  }
+  if(r.status==="Held"&&r.index===4){
+    return {tone:"danger",title:"Inventory problem needs an operations decision",owner:"Inventory specialist (task agent) found the problem; Planning Lead (goal agent) stopped the workflow",why:r.reason,actions:[["Review warehouse transfer","transfer"],["Wait for inventory","pause"],["Mark unable to fulfill","unfulfillable"]]};
+  }
+  if(r.status==="Held"&&r.index===8){
+    return {tone:"danger",title:"Safety restriction stopped this order",owner:"Carrier specialist (task agent) rejected the unsafe service; Planning Lead (goal agent) could not build a safe plan",why:r.reason,actions:[["Review safe alternatives","alternatives"],["Correct product data","correct"],["Pause this order","pause"]]};
+  }
+  if(r.status==="Recommended"){
+    return {tone:"info",title:"Recommendation is ready for your review",owner:"No agent stopped the workflow; recommend-only mode requires a person before execution",why:r.reason,actions:[["Review recommendation","alternatives"],["Approve and continue","approval"]]};
+  }
+  return {tone:"success",title:"No human help is required",owner:"Authority control cleared the plan after all agent checks passed",why:r.reason,actions:[["View order handoff","order"],["Inspect evidence","evidence"]]};
+}
 function renderRunDetail(r){
   const isApproval=r.status==="Awaiting approval", isHold=r.status==="Held";
   const tasks=taskEvidence(r);
   const stageStatus=n=>r.phase<n?"Waiting":r.phase===n&&r.status==="Running"?"Working":"Finished";
+  const intervention=interventionFor(r);
   $("#run-detail").innerHTML=`<div class="run-summary"><div><p class="eyebrow">ORDER EXECUTION · ${r.runId}</p><h2>${r.id}</h2><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.destination)} · ${escapeHtml(r.profile)}</p><small class="run-config">Instruction: ${goalName(state.runConfig.goal)} · ask below ${state.runConfig.confidence}% · ask above $${state.runConfig.costLimit}</small></div><div class="run-kpis"><div><span>Current stage</span><b>${r.status==="Running"?`${r.phase} / 4`:"4 / 4"}</b></div><div><span>Plans compared</span><b>${r.phase<3?"—":r.alternatives}</b></div><div><span>Next owner</span><b>${r.status==="Running"?"AGENTS":isApproval?"YOU":isHold?"YOU":"OPS"}</b></div></div></div>
+  <section class="workflow-drawing"><div class="workflow-heading"><div><p class="eyebrow">ORDER LIFECYCLE</p><h3>How this order moves from receipt to delivery</h3></div><span class="workflow-legend"><i></i> Current step</span></div>${lifecycleFor(r)}</section>
+  <section class="intervention-card ${intervention.tone}"><div class="intervention-main"><span class="intervention-icon">${intervention.tone==="success"?"✓":intervention.tone==="info"?"i":"!"}</span><div><p class="eyebrow">${r.status==="Running"?"CURRENT RESPONSIBILITY":"DECISION EXPLANATION"}</p><h3>${intervention.title}</h3><b>${intervention.owner}</b><p>${intervention.why}</p></div></div><div class="suggested-actions"><span>WHAT YOU CAN DO</span>${intervention.actions.map((a,i)=>`<button class="${i===0?"primary-action":"secondary-action"}" data-next-action="${a[1]}">${a[0]}${i===0?" →":""}</button>`).join("")}</div></section>
   <div class="architecture-map"><div class="${stageStatus(1).toLowerCase()}"><span>1</span><b>Coordinator</b><small>${stageStatus(1)}</small></div><i>→</i><div class="${stageStatus(2).toLowerCase()}"><span>2</span><b>Planning lead</b><small>${stageStatus(2)}</small></div><i>→</i><div class="${stageStatus(2).toLowerCase()}"><span>3</span><b>8 specialists</b><small>${stageStatus(2)}</small></div><i>→</i><div class="${stageStatus(3).toLowerCase()}"><span>4</span><b>Authority gate</b><small>${stageStatus(3)}</small></div></div>
   <div class="agent-work-log">
     <details open><summary><span class="agent-level orchestration">MANAGER</span><b>Fulfillment Coordinator</b><em>${stageStatus(1)}</em></summary><div class="work-evidence"><p><strong>Received</strong> Order event, current state, your outcome and limits.</p><p><strong>${r.phase<1?"Will do":"Did"}</strong> ${r.phase<1?"Choose the correct workflow and decide when to involve a person.":`Selected ${r.goal.replace(" goal","")} because this is ${r.index===4?"an inventory exception":"a new fulfillment order"}.`}</p><p><strong>Did not</strong> Calculate inventory, change a policy, or approve its own exception.</p></div></details>
@@ -224,6 +255,20 @@ function renderRunDetail(r){
     <details ${r.phase>=3?"open":""}><summary><span class="agent-level authority">CONTROL</span><b>Policy and human-authority gate</b><em>${stageStatus(3)}</em></summary><div class="work-evidence"><p><strong>Checked</strong> Customer promise, safety rules, your cost limit, required confidence, and automatic-action permission.</p><p><strong>Result</strong> ${r.phase<3?"Not evaluated yet.":r.status==="Running"?"Evaluating the recommended plan against your limits.":r.reason}</p><p><strong>Could not</strong> Weaken a promise, bypass safety, or increase authority.</p></div></details>
   </div>
   ${r.status==="Running"?`<div class="execution-wait"><i></i><b>Agents are working</b><span>The decision will appear only after all required evidence and authority checks finish.</span></div>`:`<div class="decision-result"><div><p class="eyebrow">GOVERNED OUTCOME</p><h3>${friendlyStatus(r.status)}</h3><p>${r.reason}</p></div><div class="plan-grid"><div><span>Warehouse</span><b>${r.allocation}</b></div><div><span>Delivery service</span><b>${r.carrier}</b></div><div><span>Expected cost</span><b>${r.cost}</b></div><div><span>On-time chance</span><b>${r.confidence}</b></div></div></div>`}`;
+  $$("[data-next-action]",$("#run-detail")).forEach(button=>button.addEventListener("click",()=>{
+    const action=button.dataset.nextAction;
+    if(action==="approval"){
+      if(!state.approvals.some(a=>a.id===r.id)){
+        state.approvals.push({id:r.id,merchant:r.merchant,plan:`${r.allocation} · ${r.carrier}`,cost:r.cost,confidence:r.confidence});
+        renderApprovals();updateCounts();
+      }
+      navigate("approvals");
+    }
+    else if(action==="order")navigate("orders");
+    else if(action==="evidence")button.closest(".run-detail").querySelector(".agent-work-log")?.scrollIntoView({behavior:"smooth"});
+    else if(action==="watch")toast("No action required — execution will continue automatically");
+    else toast(`${button.textContent.trim()} recorded as the suggested next step for ${r.id}`);
+  }));
 }
 function planFor(order){
   const base={id:order.id,merchant:order.merchant,destination:order.destination,profile:order.profile,runId:`OR-${String(order.index+1).padStart(3,"0")}-01`,time:`${(1.1+order.index*.13).toFixed(1)}s`,alternatives:3,status:"Released",goal:"Fulfillment planning goal",path:"Fulfillment planning → release",allocation:"YYZ1",carrier:"UPS Standard",cost:"$18.40",confidence:"94%",reason:"Plan meets the accepted promise and all constraints within automatic-release authority."};
