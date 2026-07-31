@@ -46,7 +46,10 @@ const state = {
     {time:"14:30:14.822",title:"Policy version evaluated",body:"Goal profiles v1.0 and guardrails v1.0 active for new runs.",code:"policy.evaluated"},
     {time:"14:28:31.207",title:"Order FS-10420 released",body:"Single-FC Toronto plan met promise at 96% confidence within authority.",code:"order.released"}
   ],
-  runConfig:{goal:"balanced",confidence:90,costLimit:35,allowSplit:true,allowAir:true,allowRecovery:true}
+  runConfig:{goal:"balanced",confidence:90,costLimit:35,allowSplit:true,allowAir:true,allowRecovery:true},
+  activeRunId:null,
+  runTimer:null,
+  agentFilter:"orchestration"
 };
 const $ = (s,root=document)=>root.querySelector(s);
 const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
@@ -56,7 +59,8 @@ const friendlyStatus = status => ({
   "Released":"Ready to fulfill",
   "Awaiting approval":"Needs a decision",
   "Held":"Paused — action needed",
-  "Recommended":"Recommendation ready"
+  "Recommended":"Recommendation ready",
+  "Running":"Agents working"
 }[status]||status);
 const goalName = value => ({balanced:"Balanced",service:"Delivery first",cost:"Cost first"}[value]||value);
 let wizardStep=1;
@@ -137,7 +141,18 @@ function renderOrders(){
   $("#all-orders-body").innerHTML=list.map(o=>`<tr><td><strong>${o.id}</strong><br><small>${escapeHtml(o.destination)}</small></td><td>${escapeHtml(o.merchant)}</td><td><span class="profile-pill">${escapeHtml(o.profile)}</span></td><td>${escapeHtml(o.allocation)}</td><td>${escapeHtml(o.carrier)}</td><td>${escapeHtml(o.decision)}</td><td><span class="state-pill ${o.status.includes("Approval")||o.status==="Held"?"attention":"ready"}" title="System status: ${escapeHtml(o.status)}">${escapeHtml(friendlyStatus(o.status))}</span></td></tr>`).join("");
 }
 function renderAgents(){
-  $("#agent-grid").innerHTML=AGENTS.map(a=>`<article class="agent-card"><header><i>${a[0]}</i><div><h2>${a[1]}</h2><small>${a[2]}</small></div></header><p>${a[3]}</p><div class="agent-meta"><span>${a[4]}</span><b>● ${a[5]}</b></div></article>`).join("");
+  const filter=state.agentFilter;
+  const filtered=AGENTS.filter(a=>a[2].toLowerCase().startsWith(filter));
+  const explainers={
+    orchestration:["Coordinator layer","Chooses the right workflow, responds when facts change, and decides when a person must be involved.","Inputs: order event, current state, policy version, prior results","Cannot: calculate inventory, change rules, or approve its own exception"],
+    goal:["Workflow-lead layer","Ensures the correct sequence of specialist checks is completed for a specific business outcome.","Inputs: selected goal, success criteria, agent results, operating limits","Cannot: write inventory, create shipments, or skip a required check"],
+    task:["Specialist layer","Returns one narrow fact or calculation with evidence. Most specialists are deterministic services, not language models.","Inputs: only the minimum fields needed for its check","Cannot: choose the final plan or mutate any operational state"]
+  };
+  const e=explainers[filter];
+  $("#agent-layer-explainer").innerHTML=`<div><p class="eyebrow">${e[0]}</p><h2>${e[1]}</h2></div><div><span>${e[2]}</span><span>${e[3]}</span></div>`;
+  $("#agent-grid").innerHTML=filtered.map(a=>{
+    const parameters=a[2].startsWith("ORCHESTRATION")?"Max 12 transitions · 3 replans · fail closed":a[2].startsWith("GOAL")?"Required-check ledger · 30s timeout · version pinned":"3s timeout · schema validated · read-only";
+    return `<article class="agent-card"><header><i>${a[0]}</i><div><h2>${a[1]}</h2><small>${a[2]}</small></div></header><p>${a[3]}</p><dl class="agent-parameters"><div><dt>Execution</dt><dd>${a[4]}</dd></div><div><dt>Internal parameters</dt><dd>${parameters}</dd></div><div><dt>Authority</dt><dd>${a[2].startsWith("TASK")?"Return evidence only":"Propose; mutations require control service"}</dd></div></dl><div class="agent-meta"><span>Version pinned for every run</span><b>● ${a[5]}</b></div></article>`}).join("");
 }
 function renderGoals(){
   const goals=[
@@ -177,19 +192,38 @@ function renderRuns(){
   $("#runs-empty").classList.toggle("hidden",state.runs.length>0);
   $("#runs-layout").classList.toggle("hidden",!state.runs.length);
   if(!state.runs.length)return;
-  $("#run-list").innerHTML=state.runs.map((r,i)=>`<button class="run-list-item ${i===0?"active":""}" data-run="${r.id}"><div><strong>${r.id}</strong><span class="state-pill ${r.status==="Awaiting approval"?"attention":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></div><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.profile)}</p><small>${friendlyStatus(r.status)==="Ready to fulfill"?"Planning finished — fulfillment can begin":friendlyStatus(r.status)}</small></button>`).join("");
-  $$(".run-list-item").forEach(b=>b.addEventListener("click",()=>{$$(".run-list-item").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderRunDetail(state.runs.find(r=>r.id===b.dataset.run));}));
-  renderRunDetail(state.runs[0]);
+  if(!state.activeRunId||!state.runs.some(r=>r.id===state.activeRunId))state.activeRunId=state.runs[0].id;
+  $("#run-list").innerHTML=state.runs.map(r=>`<button class="run-list-item ${r.id===state.activeRunId?"active":""}" data-run="${r.id}"><div><strong>${r.id}</strong><span class="state-pill ${r.status==="Awaiting approval"?"attention":r.status==="Running"?"working":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></div><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.profile)}</p><small>${r.status==="Running"?`Step ${r.phase} of 4 · ${["Preparing","Coordinator selecting workflow","Specialists checking facts","Comparing plans","Applying authority"][r.phase]}`:friendlyStatus(r.status)==="Ready to fulfill"?"Planning finished — fulfillment can begin":friendlyStatus(r.status)}</small></button>`).join("");
+  $$(".run-list-item").forEach(b=>b.addEventListener("click",()=>{state.activeRunId=b.dataset.run;renderRuns();}));
+  renderRunDetail(state.runs.find(r=>r.id===state.activeRunId));
+}
+function taskEvidence(r){
+  const pending=r.phase<2;
+  const stopped=r.finalStatus==="Held";
+  return [
+    ["Order and payment","Order lines + payment status","Valid order · payment authorized","Did not capture or change payment"],
+    ["Address and delivery area","Customer destination","Serviceable zone · remote-area flag checked","Did not edit the customer address"],
+    ["Inventory","SKU quantities at 3 warehouses",r.index===4?"Shortage: 0 available after safety stock":"Available quantity and record version returned","Did not reserve or move inventory"],
+    ["Facility timing","Workload, hours, pickup cutoff",r.index===3?"Toronto pickup missed · Columbus remains feasible":"Facility has capacity before pickup","Did not change facility workload"],
+    ["Package safety","Product dimensions + handling flags",r.index===8?"Battery restriction requires approved service":"Supported package selected","Did not waive a safety restriction"],
+    ["Carrier options","Route, parcel, and product rules",stopped&&r.index===8?"No safe air option":"Eligible end-to-end services returned","Did not book transportation"],
+    ["Delivery estimate","Eligible service + destination",r.confidence==="—"?"Not calculated — no feasible service":`${r.confidence} chance of on-time delivery`,"Did not change the promised date"],
+    ["Cost and authority","Plan costs + your limits",r.cost==="—"?"Not calculated — plan stopped":`${r.cost} expected cost · limit $${state.runConfig.costLimit}`,"Did not approve an exception"]
+  ].map((t,i)=>({name:t[0],input:t[1],output:t[2],prohibited:t[3],status:pending?"Waiting":r.phase===2&&i>3?"Working":"Finished"}));
 }
 function renderRunDetail(r){
   const isApproval=r.status==="Awaiting approval", isHold=r.status==="Held";
-  $("#run-detail").innerHTML=`<div class="run-summary"><div><p class="eyebrow">ORCHESTRATION RUN · ${r.runId}</p><h2>${r.id}</h2><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.destination)} · ${escapeHtml(r.profile)}</p><small class="run-config">Your setup: ${escapeHtml(r.configuration||"Recommended defaults")}</small></div><div class="run-kpis"><div><span>Plan time</span><b>${r.time}</b></div><div><span>Alternatives</span><b>${r.alternatives}</b></div><div><span>Decision</span><b>${isApproval?"YOU":isHold?"PAUSED":"AUTO"}</b></div></div></div>
-  <div class="hierarchy">
-    <div class="step"><span class="step-icon">1</span><h3>Fulfillment Coordinator <small>Orchestration agent</small> <span class="state-pill ready">Finished</span></h3><p>Chose the correct planning workflow, applied your ${goalName(state.runConfig.goal)} outcome, and checked whether a human decision was needed.</p></div>
-    <div class="step"><span class="step-icon">2</span><h3>Order Planning Lead <small>Goal agent</small> <span class="state-pill ${isHold?"danger":"ready"}">${isHold?"Needs help":"Finished"}</span></h3><p>Made sure all eight specialist checks were completed before comparing plans.</p><div class="task-chips"><span>✓ Order is valid</span><span>✓ Address can be served</span><span>✓ Inventory is available</span><span>✓ Facility can meet cutoff</span><span>✓ Package is safe</span><span>✓ Carrier can accept it</span><span>✓ Delivery chance calculated</span><span>✓ Cost and limits checked</span></div></div>
-    <div class="step"><span class="step-icon">D</span><h3>What happens next <span class="state-pill ${isApproval?"attention":isHold?"danger":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></h3><p>${r.reason}</p></div>
+  const tasks=taskEvidence(r);
+  const stageStatus=n=>r.phase<n?"Waiting":r.phase===n&&r.status==="Running"?"Working":"Finished";
+  $("#run-detail").innerHTML=`<div class="run-summary"><div><p class="eyebrow">ORDER EXECUTION · ${r.runId}</p><h2>${r.id}</h2><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.destination)} · ${escapeHtml(r.profile)}</p><small class="run-config">Instruction: ${goalName(state.runConfig.goal)} · ask below ${state.runConfig.confidence}% · ask above $${state.runConfig.costLimit}</small></div><div class="run-kpis"><div><span>Current stage</span><b>${r.status==="Running"?`${r.phase} / 4`:"4 / 4"}</b></div><div><span>Plans compared</span><b>${r.phase<3?"—":r.alternatives}</b></div><div><span>Next owner</span><b>${r.status==="Running"?"AGENTS":isApproval?"YOU":isHold?"YOU":"OPS"}</b></div></div></div>
+  <div class="architecture-map"><div class="${stageStatus(1).toLowerCase()}"><span>1</span><b>Coordinator</b><small>${stageStatus(1)}</small></div><i>→</i><div class="${stageStatus(2).toLowerCase()}"><span>2</span><b>Planning lead</b><small>${stageStatus(2)}</small></div><i>→</i><div class="${stageStatus(2).toLowerCase()}"><span>3</span><b>8 specialists</b><small>${stageStatus(2)}</small></div><i>→</i><div class="${stageStatus(3).toLowerCase()}"><span>4</span><b>Authority gate</b><small>${stageStatus(3)}</small></div></div>
+  <div class="agent-work-log">
+    <details open><summary><span class="agent-level orchestration">MANAGER</span><b>Fulfillment Coordinator</b><em>${stageStatus(1)}</em></summary><div class="work-evidence"><p><strong>Received</strong> Order event, current state, your outcome and limits.</p><p><strong>${r.phase<1?"Will do":"Did"}</strong> ${r.phase<1?"Choose the correct workflow and decide when to involve a person.":`Selected ${r.goal.replace(" goal","")} because this is ${r.index===4?"an inventory exception":"a new fulfillment order"}.`}</p><p><strong>Did not</strong> Calculate inventory, change a policy, or approve its own exception.</p></div></details>
+    <details ${r.phase>=2?"open":""}><summary><span class="agent-level goal">WORKFLOW LEAD</span><b>Order Planning Lead</b><em>${stageStatus(2)}</em></summary><div class="work-evidence"><p><strong>Received</strong> Workflow objective plus mandatory evidence checklist.</p><p><strong>${r.phase<2?"Will do":"Did"}</strong> ${r.phase<2?"Run all required specialist checks and compare only safe plans.":`Completed the evidence ledger and ${r.alternatives?`generated ${r.alternatives} plan alternatives`:"found no complete plan"}.`}</p><p><strong>Did not</strong> Change stock, book a carrier, or skip a required check.</p></div></details>
+    <details ${r.phase>=2?"open":""}><summary><span class="agent-level task">SPECIALISTS</span><b>Eight fact and calculation checks</b><em>${stageStatus(2)}</em></summary><div class="evidence-table">${tasks.map(t=>`<div class="evidence-row"><span class="evidence-state ${t.status.toLowerCase()}">${t.status}</span><div><b>${t.name}</b><small>Input: ${t.input}</small></div><div><strong>Output</strong><span>${t.status==="Waiting"?"Not started":t.output}</span></div><div><strong>Did not</strong><span>${t.prohibited}</span></div></div>`).join("")}</div></details>
+    <details ${r.phase>=3?"open":""}><summary><span class="agent-level authority">CONTROL</span><b>Policy and human-authority gate</b><em>${stageStatus(3)}</em></summary><div class="work-evidence"><p><strong>Checked</strong> Customer promise, safety rules, your cost limit, required confidence, and automatic-action permission.</p><p><strong>Result</strong> ${r.phase<3?"Not evaluated yet.":r.status==="Running"?"Evaluating the recommended plan against your limits.":r.reason}</p><p><strong>Could not</strong> Weaken a promise, bypass safety, or increase authority.</p></div></details>
   </div>
-  <div class="plan-box"><h3>Recommended plan · evidence snapshot v1</h3><div class="plan-grid"><div><span>Allocation</span><b>${r.allocation}</b></div><div><span>Carrier service</span><b>${r.carrier}</b></div><div><span>Expected cost</span><b>${r.cost}</b></div><div><span>On-time confidence</span><b>${r.confidence}</b></div></div></div>`;
+  ${r.status==="Running"?`<div class="execution-wait"><i></i><b>Agents are working</b><span>The decision will appear only after all required evidence and authority checks finish.</span></div>`:`<div class="decision-result"><div><p class="eyebrow">GOVERNED OUTCOME</p><h3>${friendlyStatus(r.status)}</h3><p>${r.reason}</p></div><div class="plan-grid"><div><span>Warehouse</span><b>${r.allocation}</b></div><div><span>Delivery service</span><b>${r.carrier}</b></div><div><span>Expected cost</span><b>${r.cost}</b></div><div><span>On-time chance</span><b>${r.confidence}</b></div></div></div>`}`;
 }
 function planFor(order){
   const base={id:order.id,merchant:order.merchant,destination:order.destination,profile:order.profile,runId:`OR-${String(order.index+1).padStart(3,"0")}-01`,time:`${(1.1+order.index*.13).toFixed(1)}s`,alternatives:3,status:"Released",goal:"Fulfillment planning goal",path:"Fulfillment planning → release",allocation:"YYZ1",carrier:"UPS Standard",cost:"$18.40",confidence:"94%",reason:"Plan meets the accepted promise and all constraints within automatic-release authority."};
@@ -223,22 +257,51 @@ function beginRuns(mode){
     if(numericConfidence&&numericConfidence<state.runConfig.confidence&&run.status==="Released"){run.status="Awaiting approval";run.reason=`Delivery confidence is ${numericConfidence}%, below your ${state.runConfig.confidence}% minimum.`;}
     if(mode==="recommend"&&run.status==="Released")run.status="Recommended";
     run.configuration=`${state.runConfig.goal} · ≥${state.runConfig.confidence}% · auto ≤$${state.runConfig.costLimit}`;
+    run.index=o.index;
+    run.finalStatus=run.status;
+    run.status="Running";
+    run.phase=0;
     state.runs.unshift(run);
-    o.status=run.status;o.allocation=run.allocation;o.carrier=run.carrier;o.decision=run.status==="Released"?"Auto-authorized":run.status;
-    if(run.status==="Awaiting approval")state.approvals.push({id:o.id,merchant:o.merchant,plan:`${run.allocation} · ${run.carrier}`,cost:run.cost,confidence:run.confidence});
-    audit(`Orchestration completed for ${o.id}`,`${run.goal} produced ${run.alternatives} alternatives; outcome: ${run.status}.`,"run.completed");
+    o.status="Agents working";o.decision="Evidence collection in progress";
+    audit(`Agent team started for ${o.id}`,`Coordinator received the order and your ${goalName(state.runConfig.goal)} operating instruction.`,"run.started");
     o.selected=false;
   });
+  state.activeRunId=state.runs[0]?.id||null;
   updateCounts();renderIntake();renderRuns();renderApprovals();renderOrders();
-  $("#stat-completed").textContent=38+selected.length;
-  $("#stat-auto").textContent=`${Math.round(state.orders.filter(o=>o.status==="Released").length/Math.max(1,selected.length)*100)}%`;
-  renderResults(selected);
-  navigate("command");toast(`${selected.length} orders planned — outcome summary is ready`);
+  $("#run-complete-bar").classList.add("hidden");
+  navigate("runs");toast(`${selected.length} agent teams started — open any order to watch`);
+  if(state.runTimer)clearInterval(state.runTimer);
+  let phase=0;
+  state.runTimer=setInterval(()=>{
+    phase+=1;
+    state.runs.filter(r=>r.status==="Running").forEach(r=>{r.phase=phase;});
+    if(phase<4){
+      if(phase===1)audit("Coordinator selected workflows",`${selected.length} orders were routed to the appropriate planning workflow.`,"orchestration.goal_selected");
+      if(phase===2)audit("Specialist evidence collected","Required order, inventory, facility, package, carrier, delivery, cost, and policy checks returned.","task.evidence_collected");
+      if(phase===3)audit("Plans sent to authority gate","Feasible plans are being tested against user limits and automatic-action permissions.","policy.evaluation_started");
+      renderRuns();return;
+    }
+    clearInterval(state.runTimer);state.runTimer=null;
+    state.runs.filter(r=>r.status==="Running").forEach(run=>{
+      run.status=run.finalStatus;
+      const o=state.orders.find(order=>order.id===run.id);
+      o.status=run.status;o.allocation=run.allocation;o.carrier=run.carrier;o.decision=run.status==="Released"?"Automatically authorized":friendlyStatus(run.status);
+      if(run.status==="Awaiting approval")state.approvals.push({id:o.id,merchant:o.merchant,plan:`${run.allocation} · ${run.carrier}`,cost:run.cost,confidence:run.confidence});
+      audit(`Planning finished for ${o.id}`,`${run.alternatives} alternatives considered. Governed outcome: ${friendlyStatus(run.status)}.`,"run.completed");
+    });
+    $("#stat-completed").textContent=38+selected.length;
+    $("#stat-auto").textContent=`${Math.round(state.orders.filter(o=>o.status==="Released").length/Math.max(1,selected.length)*100)}%`;
+    renderResults(selected);renderRuns();renderApprovals();renderOrders();updateCounts();
+    $("#run-complete-bar").classList.remove("hidden");
+    toast("Planning finished — review the architecture or open the summary");
+  },1100);
 }
 function reset(){
+  if(state.runTimer){clearInterval(state.runTimer);state.runTimer=null;}
   state.orders=ORDER_SEED.map((o,i)=>({id:o[0],merchant:o[1],destination:o[2],profile:o[3],promise:o[4],signal:o[5],signalState:o[6],selected:false,status:"Awaiting orchestration",allocation:"—",carrier:"—",decision:"Pending",index:i}));
   state.runs=[];state.approvals=[];state.audit=[{time:"14:32:08.441",title:"Simulation baseline verified",body:"Seed overseer-demo-v1 restored with all business invariants passing.",code:"simulation.baseline_verified"}];
   $("#results-report").classList.add("hidden");$("#start-here").classList.remove("hidden");
+  $("#run-complete-bar").classList.add("hidden");
   renderAll();navigate("command");toast("Simulation restored to overseer-demo-v1");
 }
 function renderAll(){renderIntake();renderOrders();renderAgents();renderGoals();renderPolicy();renderApprovals();renderAudit();renderRuns();updateCounts();}
@@ -265,6 +328,11 @@ $("#wizard-next").addEventListener("click",()=>showWizardStep(wizardStep+1));
 $("#wizard-back").addEventListener("click",()=>showWizardStep(wizardStep-1));
 $$("[data-wizard-go]").forEach(button=>button.addEventListener("click",()=>showWizardStep(Number(button.dataset.wizardGo))));
 $$(".agent-enabled").forEach(input=>input.addEventListener("change",()=>{if(wizardStep===4)renderConfirmation();}));
+$$("[data-agent-filter]").forEach(button=>button.addEventListener("click",()=>{
+  state.agentFilter=button.dataset.agentFilter;
+  $$("[data-agent-filter]").forEach(b=>b.classList.toggle("active",b===button));
+  renderAgents();
+}));
 $("#tour-button").addEventListener("click",()=>$("#tour-dialog").showModal());
 $("#tour-dialog").addEventListener("close",()=>{if($("#tour-dialog").returnValue==="start")navigate("intake");});
 $$("[data-recovery]").forEach(b=>b.addEventListener("click",()=>{audit("Recovery workflow started","FS-10421 disruption reassessed against remaining customer promise.","goal.delivery_recovery_started");navigate("audit");toast("Delivery recovery workflow started");}));

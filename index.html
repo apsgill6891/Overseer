@@ -153,7 +153,8 @@
           </section>
 
           <section class="view" data-view-panel="runs">
-            <div class="page-heading compact"><div><p class="eyebrow">STEP 2 OF 3 · UNDERSTAND DECISIONS</p><h1>See what the agents decided</h1><p>Choose an order on the left. Its checks, recommendation, and reason appear on the right.</p></div><span class="live-pill"><i></i> LIVE</span></div>
+            <div class="page-heading compact"><div><p class="eyebrow">EXECUTION ROOM · LIVE ARCHITECTURE</p><h1>Watch every agent work</h1><p>Choose an order to see which agents ran, what evidence they received, what they returned, and what they were prohibited from doing.</p></div><span class="live-pill"><i></i> LIVE</span></div>
+            <div id="run-complete-bar" class="run-complete-bar hidden"><div><b>All selected orders have finished planning</b><span>The outcome summary is ready, while every input and output remains available below.</span></div><button class="primary-action" data-go="command">View performance summary →</button></div>
             <div id="runs-empty" class="empty-state"><span>↯</span><h2>No agent runs yet</h2><p>Select orders from Order Intake and run the agents to observe execution.</p><button class="primary-action" data-go="intake">Go to Order Intake</button></div>
             <div id="runs-layout" class="runs-layout hidden">
               <div class="run-list" id="run-list"></div>
@@ -167,7 +168,9 @@
           </section>
 
           <section class="view" data-view-panel="agents">
-            <div class="page-heading compact"><div><p class="eyebrow">AGENT CONTROL</p><h1>Agent Registry</h1><p>Versioned capabilities with explicit execution types and authority boundaries.</p></div></div>
+            <div class="page-heading compact"><div><p class="eyebrow">ADMIN · AGENT ARCHITECTURE</p><h1>How the agent team is configured</h1><p>Review one layer at a time. Every agent shows its purpose, internal parameters, allowed actions, and prohibited actions.</p></div></div>
+            <div class="agent-type-tabs" role="tablist"><button class="active" data-agent-filter="orchestration"><b>1</b><span>Coordinator<small>Orchestration agent</small></span></button><button data-agent-filter="goal"><b>2</b><span>Workflow leads<small>Goal agents</small></span></button><button data-agent-filter="task"><b>3</b><span>Specialists<small>Task agents</small></span></button></div>
+            <div class="agent-layer-explainer" id="agent-layer-explainer"></div>
             <div class="registry-grid" id="agent-grid"></div>
           </section>
 

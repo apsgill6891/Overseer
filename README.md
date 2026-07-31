@@ -18,6 +18,10 @@ The static browser application deliberately keeps inventory arithmetic, constrai
 
 The complete approved product specification is under [`docs/specification`](docs/specification/README.md).
 
+The honest assessment of what is still required before a company can use this
+for live fulfillment is in
+[`docs/production-readiness-review.md`](docs/production-readiness-review.md).
+
 ## GitHub Pages
 
 The included Pages workflow publishes the repository root when `main` or `master` is pushed and Pages is configured to use **GitHub Actions** as its source.
