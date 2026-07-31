@@ -12,7 +12,8 @@ Open `index.html` directly in a modern browser, or serve the repository with any
 
 This repository now includes a zero-dependency Python service with persistent
 SQLite records, server-side roles, idempotent execution requests, approvals,
-and a tamper-evident audit chain:
+shadow-mode evaluation, a fail-closed execution kill switch, and a
+tamper-evident audit chain:
 
 ```powershell
 $env:OVERSEER_DEV_MODE = "1"
@@ -22,6 +23,9 @@ python server/overseer_server.py
 Then open `http://127.0.0.1:8080`. See
 [`docs/enterprise-sandbox.md`](docs/enterprise-sandbox.md) for the API,
 security boundary, and the remaining release gates.
+
+The Phase 2 PostgreSQL schema and identity/monitoring pilot requirements are in
+[`ops/README.md`](ops/README.md).
 
 ## Demo flow
 

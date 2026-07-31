@@ -16,6 +16,10 @@ class StoreTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_run_is_durable_audited_and_idempotent(self):
+        self.store.set_bounded_execution(
+            {"id": "admin@example.com", "role": "admin"}, True,
+            "Enable bounded execution for automated test",
+        )
         payload = {"order_ids": ["FS-10421"], "mode": "bounded"}
         first, replayed = self.store.create_run(self.operator, payload, "test-key-000001")
         second, replayed_second = self.store.create_run(
@@ -34,6 +38,24 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(Conflict):
             self.store.create_run(
                 self.operator, {"order_ids": ["FS-10422"]}, "test-key-000002"
+            )
+
+    def test_shadow_mode_does_not_change_order(self):
+        before = self.store.list_orders()[0]
+        result, _ = self.store.create_run(
+            self.operator, {"order_ids": [before["id"]], "mode": "shadow"},
+            "test-key-shadow-001",
+        )
+        after = self.store.list_orders()[0]
+        self.assertEqual("Shadow complete", result["status"])
+        self.assertEqual(before["status"], after["status"])
+        self.assertEqual(before["version"], after["version"])
+
+    def test_bounded_mode_is_fail_closed(self):
+        with self.assertRaises(Conflict):
+            self.store.create_run(
+                self.operator, {"order_ids": ["FS-10421"], "mode": "bounded"},
+                "test-key-bounded-01",
             )
 
 

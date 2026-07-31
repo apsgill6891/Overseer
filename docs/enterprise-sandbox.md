@@ -1,4 +1,4 @@
-# Enterprise sandbox: Phase 1
+# Enterprise sandbox: Phases 1–2
 
 This phase adds a governed application service beside the public GitHub Pages
 simulation. It is intentionally an **internal sandbox**, not a production
@@ -15,6 +15,10 @@ fulfillment system.
 - Security headers, body limits, parameter validation, and structured logs.
 - A trusted-identity-proxy boundary for future OIDC/SAML integration.
 - A deterministic API with no third-party runtime dependencies.
+- Shadow mode that records recommendations without changing order state.
+- A server-side bounded-execution kill switch that fails closed.
+- Liveness and readiness endpoints with correlation IDs.
+- A PostgreSQL schema contract and pilot operations package.
 
 ## Run the internal sandbox
 
@@ -43,7 +47,7 @@ Create an idempotent recommend-only run:
 $headers = @{ "Idempotency-Key" = "pilot-run-000001" }
 $body = @{
   order_ids = @("FS-10421")
-  mode = "recommend"
+  mode = "shadow"
   goal_profile = "balanced"
   confidence_limit = 90
   cost_limit = 35
@@ -67,7 +71,8 @@ provider, and inject verified values. Never expose the service directly.
 
 ## Still required before a company pilot
 
-1. Replace SQLite with managed PostgreSQL and add migration tooling.
+1. Implement and test the PostgreSQL runtime adapter against the included
+   schema contract.
 2. Deploy behind the company's identity-aware proxy and secrets manager.
 3. Add CSRF protection when browser writes are wired to the API.
 4. Connect a read-only staging adapter for OMS, WMS, inventory, and carrier
@@ -83,7 +88,7 @@ provider, and inject verified values. Never expose the service directly.
 | Gate | Required evidence |
 |---|---|
 | Internal sandbox | Tests pass; audit chain verifies; dev mode is local only |
-| Shadow mode | 30 days of decisions compared with human outcomes |
+| Shadow mode | 30 days and 10,000 decisions compared with human outcomes |
 | Controlled pilot | SSO, PostgreSQL, observability, backups, incident owner |
 | Bounded execution | Approved adapters, rollback, dual control, kill switch |
 | Production | SLOs met, DR tested, security/privacy approvals complete |

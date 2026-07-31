@@ -14,7 +14,6 @@ import hashlib
 import hmac
 import json
 import os
-import secrets
 import sqlite3
 import threading
 import uuid
@@ -124,6 +123,30 @@ class Store:
             )
             return [{**dict(row), "details": json.loads(row["details_json"])} for row in rows]
 
+    def controls(self) -> dict:
+        with self.connect() as db:
+            rows = db.execute("SELECT key,value,updated_by,updated_at FROM system_controls")
+            return {row["key"]: dict(row) for row in rows}
+
+    def set_bounded_execution(self, actor: dict, enabled: bool, note: str) -> dict:
+        if len(note.strip()) < 10:
+            raise ValueError("a control-change note of at least 10 characters is required")
+        value = "enabled" if enabled else "disabled"
+        changed = now()
+        with self.lock, self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                """INSERT INTO system_controls (key,value,updated_by,updated_at)
+                   VALUES ('bounded_execution',?,?,?)
+                   ON CONFLICT(key) DO UPDATE SET value=excluded.value,
+                   updated_by=excluded.updated_by,updated_at=excluded.updated_at""",
+                (value, actor["id"], changed),
+            )
+            self.audit(db, actor, "control.changed", "system_control",
+                       "bounded_execution", {"value": value, "note": note.strip()})
+            db.commit()
+        return {"bounded_execution": value, "updated_by": actor["id"], "updated_at": changed}
+
     def verify_audit(self) -> dict:
         with self.connect() as db:
             rows = db.execute("SELECT * FROM audit_events ORDER BY sequence").fetchall()
@@ -149,9 +172,13 @@ class Store:
         order_ids = payload.get("order_ids")
         if not isinstance(order_ids, list) or not order_ids or len(order_ids) > 100:
             raise ValueError("order_ids must contain 1–100 order IDs")
-        mode = payload.get("mode", "recommend")
-        if mode not in {"recommend", "bounded"}:
-            raise ValueError("mode must be recommend or bounded")
+        mode = payload.get("mode", "shadow")
+        if mode not in {"shadow", "recommend", "bounded"}:
+            raise ValueError("mode must be shadow, recommend, or bounded")
+        if mode == "bounded":
+            control = self.controls().get("bounded_execution", {})
+            if control.get("value") != "enabled":
+                raise Conflict("bounded execution is disabled by the server kill switch")
         confidence = int(payload.get("confidence_limit", 90))
         cost = int(payload.get("cost_limit", 35))
         if not 50 <= confidence <= 100 or not 0 <= cost <= 500:
@@ -194,9 +221,21 @@ class Store:
             )
             outcomes = []
             for order_id in normalized["order_ids"]:
-                outcome = "Awaiting approval" if mode == "recommend" else "Ready to fulfill"
+                outcome = {
+                    "shadow": "Shadow recommendation",
+                    "recommend": "Awaiting approval",
+                    "bounded": "Ready to fulfill",
+                }[mode]
                 db.execute("INSERT INTO run_orders VALUES (?,?,?)", (run_id, order_id, outcome))
-                if outcome == "Awaiting approval":
+                if mode == "shadow":
+                    db.execute(
+                        """INSERT INTO shadow_evaluations
+                           (id,run_id,order_id,recommendation,created_at)
+                           VALUES (?,?,?,?,?)""",
+                        (f"SHD-{uuid.uuid4().hex[:10].upper()}", run_id, order_id,
+                         "Ready to fulfill", created),
+                    )
+                elif outcome == "Awaiting approval":
                     approval_id = f"APR-{uuid.uuid4().hex[:10].upper()}"
                     db.execute(
                         """INSERT INTO approvals
@@ -211,10 +250,10 @@ class Store:
                         (created, order_id),
                     )
                 outcomes.append({"order_id": order_id, "outcome": outcome})
-            response = {
-                "run_id": run_id, "status": "Awaiting approval" if mode == "recommend"
-                else "Ready to fulfill", "orders": outcomes, "created_at": created,
-            }
+            response = {"run_id": run_id, "status": {
+                "shadow": "Shadow complete", "recommend": "Awaiting approval",
+                "bounded": "Ready to fulfill",
+            }[mode], "orders": outcomes, "created_at": created}
             self.audit(db, actor, "execution.requested", "run", run_id, normalized)
             db.execute(
                 "INSERT INTO idempotency_keys VALUES (?,?,?,?,?)",
@@ -321,12 +360,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Correlation-ID", self.correlation_id)
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         self.end_headers()
         self.wfile.write(encoded)
 
     def route(self, method: str) -> None:
+        supplied_correlation = self.headers.get("X-Correlation-ID", "").strip()
+        self.correlation_id = supplied_correlation[:80] or str(uuid.uuid4())
         parsed = urlparse(self.path)
         path = parsed.path
         if not path.startswith("/api/"):
@@ -338,6 +380,18 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.json(HTTPStatus.OK, {
                     "status": "ok", "service": "project-overseer",
                     "audit": store.verify_audit(), "time": now(),
+                })
+            if method == "GET" and path == "/api/readiness":
+                audit = store.verify_audit()
+                controls = store.controls()
+                return self.json(HTTPStatus.OK if audit["valid"] else HTTPStatus.SERVICE_UNAVAILABLE, {
+                    "ready": audit["valid"],
+                    "checks": {
+                        "database": "ready",
+                        "audit_chain": "ready" if audit["valid"] else "failed",
+                        "identity": actor["mode"],
+                        "bounded_execution": controls["bounded_execution"]["value"],
+                    },
                 })
             if method == "GET" and path == "/api/session":
                 return self.json(HTTPStatus.OK, {"actor": actor, "capabilities": {
@@ -351,6 +405,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.json(HTTPStatus.OK, {
                     "events": store.list_audit(), "verification": store.verify_audit(),
                 })
+            if method == "GET" and path == "/api/controls":
+                return self.json(HTTPStatus.OK, {"controls": store.controls()})
+            if method == "POST" and path == "/api/controls/bounded-execution":
+                if actor["role"] not in ADMIN_ROLES:
+                    return self.json(HTTPStatus.FORBIDDEN, {"error": "admin role required"})
+                payload = self.read_json()
+                if not isinstance(payload.get("enabled"), bool):
+                    raise ValueError("enabled must be true or false")
+                return self.json(HTTPStatus.OK, store.set_bounded_execution(
+                    actor, payload["enabled"], str(payload.get("note", ""))
+                ))
             if method == "POST" and path == "/api/runs":
                 if actor["role"] not in WRITE_ROLES:
                     return self.json(HTTPStatus.FORBIDDEN, {"error": "operator role required"})

@@ -63,7 +63,31 @@ CREATE TABLE IF NOT EXISTS audit_events (
   event_hash TEXT NOT NULL UNIQUE
 );
 
+CREATE TABLE IF NOT EXISTS shadow_evaluations (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES execution_runs(id),
+  order_id TEXT NOT NULL REFERENCES orders(id),
+  recommendation TEXT NOT NULL,
+  baseline_outcome TEXT,
+  matched_baseline INTEGER,
+  reviewed_by TEXT,
+  reviewed_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS system_controls (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO system_controls (key,value,updated_by,updated_at)
+VALUES ('bounded_execution','disabled','system','1970-01-01T00:00:00.000Z');
+
 CREATE INDEX IF NOT EXISTS idx_audit_object
   ON audit_events(object_type, object_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_approvals_status
   ON approvals(status, order_id);
+CREATE INDEX IF NOT EXISTS idx_shadow_review
+  ON shadow_evaluations(matched_baseline, created_at);
