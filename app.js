@@ -45,11 +45,19 @@ const state = {
     {time:"14:31:52.109",title:"Carrier disruption received",body:"UPS Standard event linked to FS-10421 and routed for recovery assessment.",code:"tracking.disruption_received"},
     {time:"14:30:14.822",title:"Policy version evaluated",body:"Goal profiles v1.0 and guardrails v1.0 active for new runs.",code:"policy.evaluated"},
     {time:"14:28:31.207",title:"Order FS-10420 released",body:"Single-FC Toronto plan met promise at 96% confidence within authority.",code:"order.released"}
-  ]
+  ],
+  runConfig:{goal:"balanced",confidence:90,costLimit:35,allowSplit:true,allowAir:true,allowRecovery:true}
 };
 const $ = (s,root=document)=>root.querySelector(s);
 const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const friendlyStatus = status => ({
+  "Awaiting orchestration":"Not planned yet",
+  "Released":"Ready to fulfill",
+  "Awaiting approval":"Needs a decision",
+  "Held":"Paused — action needed",
+  "Recommended":"Recommendation ready"
+}[status]||status);
 
 function navigate(view){
   $$(".view").forEach(v=>v.classList.toggle("active",v.dataset.viewPanel===view));
@@ -64,8 +72,10 @@ function renderResults(processed){
   $("#result-savings").textContent=`$${savings.toFixed(2)}`;
   $("#result-released").textContent=`${released} / ${processed.length}`;
   $("#result-promises").textContent=protectedPromises;
-  $("#result-time").textContent=`${processed.length*7} min`;
   $("#report-sentence").textContent=`${processed.length} orders evaluated. ${released} required no human work; ${processed.length-released} need review or corrective action.`;
+  $("#savings-track").style.width=`${Math.min(100,savings/50*100)}%`;
+  $("#auto-track").style.width=`${Math.min(100,released/processed.length/0.7*100)}%`;
+  $("#promise-track").style.width=`${Math.min(100,protectedPromises/processed.length*100)}%`;
   const issues=[];
   if(processed.some(o=>o.index===4))issues.push(["Inventory shortage","Network stock is unavailable after protected safety stock.","orders"]);
   if(processed.some(o=>[5,7].includes(o.index)))issues.push(["Cost authority exceeded","An air upgrade or split needs human approval.","approvals"]);
@@ -83,7 +93,7 @@ function renderIntake(){
     <td><input class="order-check" type="checkbox" data-id="${o.id}" ${o.selected?"checked":""} aria-label="Select ${o.id}"></td>
     <td><strong>${o.id}</strong></td><td>${escapeHtml(o.merchant)}</td><td>${escapeHtml(o.destination)}</td>
     <td><span class="profile-pill">${escapeHtml(o.profile)}</span></td><td>${escapeHtml(o.promise)}</td>
-    <td><span class="row-signal"><i></i>${escapeHtml(o.signal)}</span></td><td><span class="state-pill ${o.signalState}">${escapeHtml(o.status)}</span></td></tr>`).join("");
+    <td><span class="row-signal"><i></i>${escapeHtml(o.signal)}</span></td><td><span class="state-pill ${o.signalState}" title="System status: ${escapeHtml(o.status)}">${escapeHtml(friendlyStatus(o.status))}</span></td></tr>`).join("");
   const n=state.orders.filter(o=>o.selected).length;
   $("#selection-label").textContent=`${n} selected`;
   $("#master-check").checked=n===state.orders.length;
@@ -93,7 +103,7 @@ function renderIntake(){
 function renderOrders(){
   const q=($("#order-search")?.value||"").toLowerCase();
   const list=state.orders.filter(o=>`${o.id} ${o.merchant}`.toLowerCase().includes(q));
-  $("#all-orders-body").innerHTML=list.map(o=>`<tr><td><strong>${o.id}</strong><br><small>${escapeHtml(o.destination)}</small></td><td>${escapeHtml(o.merchant)}</td><td><span class="profile-pill">${escapeHtml(o.profile)}</span></td><td>${escapeHtml(o.allocation)}</td><td>${escapeHtml(o.carrier)}</td><td>${escapeHtml(o.decision)}</td><td><span class="state-pill ${o.status.includes("Approval")||o.status==="Held"?"attention":"ready"}">${escapeHtml(o.status)}</span></td></tr>`).join("");
+  $("#all-orders-body").innerHTML=list.map(o=>`<tr><td><strong>${o.id}</strong><br><small>${escapeHtml(o.destination)}</small></td><td>${escapeHtml(o.merchant)}</td><td><span class="profile-pill">${escapeHtml(o.profile)}</span></td><td>${escapeHtml(o.allocation)}</td><td>${escapeHtml(o.carrier)}</td><td>${escapeHtml(o.decision)}</td><td><span class="state-pill ${o.status.includes("Approval")||o.status==="Held"?"attention":"ready"}" title="System status: ${escapeHtml(o.status)}">${escapeHtml(friendlyStatus(o.status))}</span></td></tr>`).join("");
 }
 function renderAgents(){
   $("#agent-grid").innerHTML=AGENTS.map(a=>`<article class="agent-card"><header><i>${a[0]}</i><div><h2>${a[1]}</h2><small>${a[2]}</small></div></header><p>${a[3]}</p><div class="agent-meta"><span>${a[4]}</span><b>● ${a[5]}</b></div></article>`).join("");
@@ -113,13 +123,13 @@ function renderPolicy(){
 function renderApprovals(){
   const el=$("#approval-list");
   if(!state.approvals.length){el.innerHTML=`<div class="approval-empty">No open approval requests. Exceptions generated by agent runs will appear here.</div>`;return;}
-  el.innerHTML=state.approvals.map(a=>`<article class="approval-card" data-approval="${a.id}"><div><p class="eyebrow">OPEN · AIR UPGRADE OVER AUTHORITY</p><h2>${a.id} · ${escapeHtml(a.merchant)}</h2><p>Ground service misses the accepted promise. Air is the only plan above the required delivery confidence.</p><div class="approval-facts"><div><span>Selected plan</span><b>${a.plan}</b></div><div><span>Expected cost</span><b>${a.cost}</b></div><div><span>On-time confidence</span><b>${a.confidence}</b></div></div></div><div class="approval-actions"><button class="reject" data-decision="reject">Hold</button><button class="approve" data-decision="approve">Approve & release</button></div></article>`).join("");
+  el.innerHTML=state.approvals.map(a=>`<article class="approval-card" data-approval="${a.id}"><div><p class="eyebrow">YOUR DECISION · COST LIMIT EXCEEDED</p><h2>${a.id} · ${escapeHtml(a.merchant)}</h2><p>Ground service misses the promised date. Air is the only option above your required delivery confidence.</p><div class="approval-facts"><div><span>Recommended plan</span><b>${a.plan}</b></div><div><span>Expected cost</span><b>${a.cost}</b></div><div><span>Delivery confidence</span><b>${a.confidence}</b></div></div></div><div class="approval-actions"><button class="reject" data-decision="reject">Pause order</button><button class="approve" data-decision="approve">Approve & continue</button></div></article>`).join("");
   $$("[data-decision]").forEach(btn=>btn.addEventListener("click",()=>decideApproval(btn.closest("[data-approval]").dataset.approval,btn.dataset.decision)));
 }
 function decideApproval(id,decision){
   const approval=state.approvals.find(a=>a.id===id), order=state.orders.find(o=>o.id===id);
-  if(decision==="approve"){order.status="Released";order.decision="Human approved";order.allocation="YVR1";order.carrier="FedEx Priority";audit("Human approval committed",`${id} recommendation v1 revalidated and released by Alex Ortega.`,"approval.approved");toast(`${id} approved and released`);}
-  else {order.status="Held";order.decision="Held by overseer";audit("Approval held",`${id} retained without operational mutation.`,"approval.held");toast(`${id} placed on hold`);}
+  if(decision==="approve"){order.status="Released";order.decision="Human approved";order.allocation="YVR1";order.carrier="FedEx Priority";audit("Human approval committed",`${id} recommendation v1 revalidated and allowed to continue by Alex Ortega.`,"approval.approved");toast(`${id} approved and ready to fulfill`);}
+  else {order.status="Held";order.decision="Paused by overseer";audit("Order paused",`${id} retained without operational mutation.`,"approval.held");toast(`${id} paused for follow-up`);}
   state.approvals=state.approvals.filter(a=>a.id!==id);updateCounts();renderApprovals();renderOrders();
 }
 function audit(title,body,code){
@@ -136,17 +146,17 @@ function renderRuns(){
   $("#runs-empty").classList.toggle("hidden",state.runs.length>0);
   $("#runs-layout").classList.toggle("hidden",!state.runs.length);
   if(!state.runs.length)return;
-  $("#run-list").innerHTML=state.runs.map((r,i)=>`<button class="run-list-item ${i===0?"active":""}" data-run="${r.id}"><div><strong>${r.id}</strong><span class="state-pill ${r.status==="Awaiting approval"?"attention":"ready"}">${r.status}</span></div><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.profile)}</p><small>${r.path}</small></button>`).join("");
+  $("#run-list").innerHTML=state.runs.map((r,i)=>`<button class="run-list-item ${i===0?"active":""}" data-run="${r.id}"><div><strong>${r.id}</strong><span class="state-pill ${r.status==="Awaiting approval"?"attention":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></div><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.profile)}</p><small>${r.path}</small></button>`).join("");
   $$(".run-list-item").forEach(b=>b.addEventListener("click",()=>{$$(".run-list-item").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderRunDetail(state.runs.find(r=>r.id===b.dataset.run));}));
   renderRunDetail(state.runs[0]);
 }
 function renderRunDetail(r){
   const isApproval=r.status==="Awaiting approval", isHold=r.status==="Held";
-  $("#run-detail").innerHTML=`<div class="run-summary"><div><p class="eyebrow">ORCHESTRATION RUN · ${r.runId}</p><h2>${r.id}</h2><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.destination)} · ${escapeHtml(r.profile)}</p></div><div class="run-kpis"><div><span>Plan time</span><b>${r.time}</b></div><div><span>Alternatives</span><b>${r.alternatives}</b></div><div><span>Decision</span><b>${isApproval?"HUMAN":isHold?"HELD":"AUTO"}</b></div></div></div>
+  $("#run-detail").innerHTML=`<div class="run-summary"><div><p class="eyebrow">ORCHESTRATION RUN · ${r.runId}</p><h2>${r.id}</h2><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.destination)} · ${escapeHtml(r.profile)}</p><small class="run-config">Your setup: ${escapeHtml(r.configuration||"Recommended defaults")}</small></div><div class="run-kpis"><div><span>Plan time</span><b>${r.time}</b></div><div><span>Alternatives</span><b>${r.alternatives}</b></div><div><span>Decision</span><b>${isApproval?"YOU":isHold?"PAUSED":"AUTO"}</b></div></div></div>
   <div class="hierarchy">
     <div class="step"><span class="step-icon">O</span><h3>Fulfillment Orchestrator <span class="state-pill ready">Succeeded</span></h3><p>Selected ${r.goal}; pinned ${escapeHtml(r.profile)} profile v1.0 and guardrails v1.0.</p></div>
     <div class="step"><span class="step-icon">G</span><h3>${r.goal} <span class="state-pill ${isHold?"danger":"ready"}">${isHold?"Escalated":"Completed"}</span></h3><p>All mandatory checks returned current, schema-valid evidence.</p><div class="task-chips"><span>✓ Order validation</span><span>✓ Address zone</span><span>✓ Inventory ATP</span><span>✓ Capacity / cutoff</span><span>✓ Packaging</span><span>✓ Carrier services</span><span>✓ Delivery estimate</span><span>✓ Policy authority</span></div></div>
-    <div class="step"><span class="step-icon">D</span><h3>Decision checkpoint <span class="state-pill ${isApproval?"attention":isHold?"danger":"ready"}">${r.status}</span></h3><p>${r.reason}</p></div>
+    <div class="step"><span class="step-icon">D</span><h3>What happens next <span class="state-pill ${isApproval?"attention":isHold?"danger":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></h3><p>${r.reason}</p></div>
   </div>
   <div class="plan-box"><h3>Recommended plan · evidence snapshot v1</h3><div class="plan-grid"><div><span>Allocation</span><b>${r.allocation}</b></div><div><span>Carrier service</span><b>${r.carrier}</b></div><div><span>Expected cost</span><b>${r.cost}</b></div><div><span>On-time confidence</span><b>${r.confidence}</b></div></div></div>`;
 }
@@ -164,8 +174,24 @@ function planFor(order){
 }
 function beginRuns(mode){
   const selected=state.orders.filter(o=>o.selected);
+  state.runConfig={
+    goal:$('input[name="goalPreset"]:checked').value,
+    confidence:Number($("#confidence-limit").value),
+    costLimit:Number($("#cost-limit").value),
+    allowSplit:$("#allow-split").checked,
+    allowAir:$("#allow-air").checked,
+    allowRecovery:$("#allow-recovery").checked
+  };
   selected.forEach(o=>{
-    const run=planFor(o); if(mode==="recommend"&&run.status==="Released")run.status="Recommended";
+    const run=planFor(o);
+    const numericCost=Number(run.cost.replace(/[^0-9.]/g,""))||0;
+    const numericConfidence=Number(run.confidence.replace("%",""))||0;
+    if(o.index===5&&!state.runConfig.allowSplit){run.status="Held";run.reason="Split shipments were disabled for this run. No complete single-facility plan meets the promise.";}
+    if(o.index===7&&!state.runConfig.allowAir){run.status="Held";run.reason="Air upgrades were disabled for this run. Available ground services miss the accepted promise.";}
+    if(numericCost>state.runConfig.costLimit&&run.status==="Released"){run.status="Awaiting approval";run.reason=`The recommended plan costs $${numericCost.toFixed(2)}, above your $${state.runConfig.costLimit} automatic limit.`;}
+    if(numericConfidence&&numericConfidence<state.runConfig.confidence&&run.status==="Released"){run.status="Awaiting approval";run.reason=`Delivery confidence is ${numericConfidence}%, below your ${state.runConfig.confidence}% minimum.`;}
+    if(mode==="recommend"&&run.status==="Released")run.status="Recommended";
+    run.configuration=`${state.runConfig.goal} · ≥${state.runConfig.confidence}% · auto ≤$${state.runConfig.costLimit}`;
     state.runs.unshift(run);
     o.status=run.status;o.allocation=run.allocation;o.carrier=run.carrier;o.decision=run.status==="Released"?"Auto-authorized":run.status;
     if(run.status==="Awaiting approval")state.approvals.push({id:o.id,merchant:o.merchant,plan:`${run.allocation} · ${run.carrier}`,cost:run.cost,confidence:run.confidence});
@@ -195,6 +221,15 @@ $("#run-dialog").addEventListener("close",()=>{if($("#run-dialog").returnValue==
 $("#order-search").addEventListener("input",renderOrders);
 $("#reset-button").addEventListener("click",()=>{if(confirm("Reset all mutable simulation state to overseer-demo-v1?"))reset();});
 $("#profile-button").addEventListener("click",()=>toast("Role: Orchestration Overseer · Full operational scope"));
+$("#language-help").addEventListener("click",()=>toast("Plain labels are shown first. Hover a status to see its system term."));
+$("#confidence-limit").addEventListener("input",e=>$("#confidence-output").textContent=`${e.target.value}%`);
+$("#cost-limit").addEventListener("input",e=>$("#cost-output").textContent=`$${e.target.value}`);
+$$('input[name="goalPreset"]').forEach(input=>input.addEventListener("change",()=>{
+  $$(".goal-presets label").forEach(label=>label.classList.toggle("selected",label.contains($('input[name="goalPreset"]:checked'))));
+  const values={balanced:[90,35],service:[95,55],cost:[85,25]}, preset=values[$('input[name="goalPreset"]:checked').value];
+  $("#confidence-limit").value=preset[0];$("#confidence-output").textContent=`${preset[0]}%`;
+  $("#cost-limit").value=preset[1];$("#cost-output").textContent=`$${preset[1]}`;
+}));
 $("#tour-button").addEventListener("click",()=>$("#tour-dialog").showModal());
 $("#tour-dialog").addEventListener("close",()=>{if($("#tour-dialog").returnValue==="start")navigate("intake");});
 $$("[data-recovery]").forEach(b=>b.addEventListener("click",()=>{audit("Recovery workflow started","FS-10421 disruption reassessed against remaining customer promise.","goal.delivery_recovery_started");navigate("audit");toast("Delivery recovery workflow started");}));

@@ -26,17 +26,17 @@
           <div><strong>OVERSEER</strong><small>FLOW<span>SHIP</span></small></div>
         </div>
         <nav id="primary-nav">
-          <button class="nav-item active" data-view="command"><i>⌁</i><span>Command Centre</span></button>
-          <button class="nav-item" data-view="intake"><i>＋</i><span>Order Intake</span><b id="intake-count">10</b></button>
-          <button class="nav-item" data-view="runs"><i>↯</i><span>Live Runs</span><b id="run-count">0</b></button>
-          <button class="nav-item" data-view="orders"><i>▤</i><span>Orders</span></button>
-          <div class="nav-label">AGENT CONTROL</div>
-          <button class="nav-item" data-view="agents"><i>⌘</i><span>Agent Registry</span></button>
-          <button class="nav-item" data-view="goals"><i>◎</i><span>Goal Management</span></button>
-          <button class="nav-item" data-view="policy"><i>◇</i><span>Policy & Guardrails</span></button>
-          <div class="nav-label">GOVERNANCE</div>
-          <button class="nav-item" data-view="approvals"><i>✓</i><span>Approval Queue</span><b id="approval-count">0</b></button>
-          <button class="nav-item" data-view="audit"><i>≡</i><span>Audit Centre</span></button>
+          <div class="nav-label first">DAILY WORK</div>
+          <button class="nav-item active" data-view="command"><i>⌁</i><span>Overview<small>Start here</small></span></button>
+          <button class="nav-item" data-view="intake"><i>＋</i><span>New orders<small>Select and configure</small></span><b id="intake-count">10</b></button>
+          <button class="nav-item" data-view="runs"><i>↯</i><span>Agent results<small>What was decided</small></span><b id="run-count">0</b></button>
+          <button class="nav-item" data-view="approvals"><i>✓</i><span>Needs my decision<small>Exceptions only</small></span><b id="approval-count">0</b></button>
+          <button class="nav-item" data-view="orders"><i>▤</i><span>All orders<small>Operational history</small></span></button>
+          <div class="nav-label">ADMIN & OVERSIGHT <em>ADMIN</em></div>
+          <button class="nav-item admin-nav" data-view="agents"><i>⌘</i><span>Agent setup<small>Definitions and health</small></span></button>
+          <button class="nav-item admin-nav" data-view="goals"><i>◎</i><span>Goal templates<small>Workflow definitions</small></span></button>
+          <button class="nav-item admin-nav" data-view="policy"><i>◇</i><span>Rules & limits<small>Admin only</small></span></button>
+          <button class="nav-item admin-nav" data-view="audit"><i>≡</i><span>Audit history<small>Auditor / admin</small></span></button>
         </nav>
         <div class="system-card">
           <div><span class="status-dot"></span><strong>All systems nominal</strong></div>
@@ -57,6 +57,13 @@
             <button class="icon-button" aria-label="Notifications">♢<span class="notification-dot"></span></button>
           </div>
         </header>
+        <div class="language-guide" aria-label="Status terminology">
+          <strong>STATUS GUIDE</strong>
+          <span><i class="guide-green"></i><b>Ready to fulfill</b> <em>was “Released”</em></span>
+          <span><i class="guide-amber"></i><b>Needs a decision</b> <em>was “Awaiting approval”</em></span>
+          <span><i class="guide-grey"></i><b>Paused</b> <em>was “Held”</em></span>
+          <button id="language-help">Why these terms?</button>
+        </div>
 
         <main id="main">
           <section class="view active" data-view-panel="command">
@@ -85,10 +92,9 @@
                 <button class="secondary-action" data-go="runs">Inspect decisions →</button>
               </div>
               <div class="value-grid">
-                <article><span>Estimated shipping savings</span><strong id="result-savings">$0.00</strong><small>versus fastest feasible plans</small></article>
-                <article><span>Orders auto-released</span><strong id="result-released">0 / 0</strong><small>no human work required</small></article>
-                <article><span>Promises protected</span><strong id="result-promises">0</strong><small>within required confidence</small></article>
-                <article><span>Manual planning avoided</span><strong id="result-time">0 min</strong><small>estimated operator time</small></article>
+                <article><span>Shipping cost saved</span><strong id="result-savings">$0.00</strong><small>Target: save at least $50</small><div class="target-track"><i id="savings-track"></i></div></article>
+                <article><span>Automatically completed</span><strong id="result-released">0 / 0</strong><small>Target: at least 70%</small><div class="target-track"><i id="auto-track"></i></div></article>
+                <article><span>Delivery promises protected</span><strong id="result-promises">0</strong><small>Target: 100% of feasible orders</small><div class="target-track"><i id="promise-track"></i></div></article>
               </div>
               <div class="report-bottom">
                 <div class="issue-summary"><div class="report-section-title"><h3>Biggest issues to address</h3><span>Prioritized by customer impact</span></div><div id="top-issues"></div></div>
@@ -107,7 +113,7 @@
                   <button data-go="approvals">Review <span>→</span></button>
                 </article>
                 <article class="attention-item red">
-                  <div class="item-icon">!</div><div><span class="tag">DELIVERY RISK</span><h3>Carrier disruption on released order</h3><p>Order <b>FS-10421</b> · UPS Standard · In transit</p><div class="impact"><span>Recovery window</span><b>47 min</b><span>before risk increases</span></div></div>
+                  <div class="item-icon">!</div><div><span class="tag">DELIVERY RISK</span><h3>Carrier disruption after fulfillment began</h3><p>Order <b>FS-10421</b> · UPS Standard · In transit</p><div class="impact"><span>Recovery window</span><b>47 min</b><span>before risk increases</span></div></div>
                   <button data-recovery>Start recovery <span>→</span></button>
                 </article>
                 <article class="attention-item blue">
@@ -128,7 +134,7 @@
               </section>
               <section class="card activity-card">
                 <div class="card-title"><div><h2>Agent activity</h2><p>Last 60 minutes</p></div><button data-go="runs">View runs</button></div>
-                <div class="activity-stats"><div><strong id="stat-completed">38</strong><span>Runs completed</span><small>↑ 12% vs prior hour</small></div><div><strong id="stat-auto">84%</strong><span>Auto-release rate</span><small>32 of 38 orders</small></div><div><strong>1.8s</strong><span>Median plan time</span><small>Within target</small></div></div>
+                <div class="activity-stats"><div><strong id="stat-completed">38</strong><span>Orders planned</span><small>↑ 12% vs prior hour</small></div><div><strong id="stat-auto">84%</strong><span>Automatic completion</span><small>32 of 38 orders</small></div><div><strong>1.8s</strong><span>Median plan time</span><small>Within target</small></div></div>
                 <div class="agent-flow"><span><i class="orch">O</i> Orchestration</span><b>1 active</b><span><i class="goal">G</i> Goal agents</span><b>2 active</b><span><i class="task">T</i> Task agents</span><b>6 active</b></div>
               </section>
             </div>
@@ -139,7 +145,7 @@
               <div><p class="eyebrow">STEP 1 OF 3 · SELECT ORDERS</p><h1>Choose orders to plan</h1><p>Select any orders below—or use “Select all”—then run the agents.</p></div>
               <div class="heading-actions"><button class="secondary-action" id="select-all">Select all</button><button class="primary-action" id="run-agents">Run agents <span>↯</span></button></div>
             </div>
-            <div class="instruction-strip"><b>What happens next?</b><span>Each selected order gets its own plan. Safe decisions can release automatically; costly, unsafe, or uncertain decisions come back to you.</span></div>
+            <div class="instruction-strip"><b>What happens next?</b><span>Each selected order gets its own plan. You choose the goal and limits before agents begin. Safe decisions can proceed automatically; costly, unsafe, or uncertain decisions come back to you.</span></div>
             <div class="table-card">
               <div class="table-tools"><label><input type="checkbox" id="master-check" /> <span id="selection-label">0 selected</span></label><div><span class="legend"><i class="det"></i> Deterministic core</span><span class="legend"><i class="human"></i> Human gate likely</span></div></div>
               <div class="table-scroll"><table><thead><tr><th></th><th>Order</th><th>Merchant</th><th>Destination</th><th>Profile</th><th>Promise</th><th>Scenario signal</th><th>Status</th></tr></thead><tbody id="orders-body"></tbody></table></div>
@@ -157,7 +163,7 @@
 
           <section class="view" data-view-panel="orders">
             <div class="page-heading compact"><div><p class="eyebrow">OPERATIONS</p><h1>Orders</h1><p>Every fulfillment decision, allocation, and shipment in one lifecycle.</p></div></div>
-            <div class="table-card"><div class="table-tools"><label class="search">⌕ <input id="order-search" placeholder="Search order or merchant" /></label><div class="filter-pills"><button class="active">All</button><button>Exceptions</button><button>Released</button></div></div><div class="table-scroll"><table><thead><tr><th>Order</th><th>Merchant</th><th>Profile</th><th>Allocation</th><th>Carrier</th><th>Decision</th><th>Status</th></tr></thead><tbody id="all-orders-body"></tbody></table></div></div>
+            <div class="table-card"><div class="table-tools"><label class="search">⌕ <input id="order-search" placeholder="Search order or merchant" /></label><div class="filter-pills"><button class="active">All</button><button>Needs attention</button><button>Ready to fulfill</button></div></div><div class="table-scroll"><table><thead><tr><th>Order</th><th>Merchant</th><th>Profile</th><th>Allocation</th><th>Carrier</th><th>Decision</th><th>Status</th></tr></thead><tbody id="all-orders-body"></tbody></table></div></div>
           </section>
 
           <section class="view" data-view-panel="agents">
@@ -192,6 +198,21 @@
       <form method="dialog">
         <div class="dialog-head"><span class="dialog-icon">↯</span><div><p class="eyebrow">EXECUTION CONFIRMATION</p><h2>Run fulfillment agents</h2></div><button value="cancel" aria-label="Close">×</button></div>
         <p id="dialog-copy"></p>
+        <div class="configuration-heading"><div><span>1</span><div><b>Choose the operating goal</b><small>A recommended setup is selected. You can change it before execution.</small></div></div><span class="recommended-badge">RECOMMENDED</span></div>
+        <div class="goal-presets">
+          <label class="selected"><input type="radio" name="goalPreset" value="balanced" checked /><span><b>Balanced</b><small>Protect promises while controlling cost</small></span></label>
+          <label><input type="radio" name="goalPreset" value="service" /><span><b>Service first</b><small>Maximize delivery confidence</small></span></label>
+          <label><input type="radio" name="goalPreset" value="cost" /><span><b>Cost first</b><small>Use the lowest-cost promise-safe plan</small></span></label>
+        </div>
+        <details class="agent-controls">
+          <summary>Adjust agent limits <span>Optional</span></summary>
+          <div class="control-row"><label for="confidence-limit"><b>Minimum delivery confidence</b><small>Agent must escalate below this level</small></label><output id="confidence-output">90%</output><input id="confidence-limit" type="range" min="80" max="99" value="90" /></div>
+          <div class="control-row"><label for="cost-limit"><b>Automatic shipping-cost limit</b><small>Higher-cost choices require your approval</small></label><output id="cost-output">$35</output><input id="cost-limit" type="range" min="15" max="80" step="5" value="35" /></div>
+          <label class="switch-row"><span><b>Allow split shipments</b><small>Only when needed to protect the promise</small></span><input id="allow-split" type="checkbox" checked /><i></i></label>
+          <label class="switch-row"><span><b>Allow air upgrades</b><small>Still subject to the cost limit above</small></span><input id="allow-air" type="checkbox" checked /><i></i></label>
+          <label class="switch-row"><span><b>Start recovery automatically</b><small>Replan when a carrier disruption occurs</small></span><input id="allow-recovery" type="checkbox" checked /><i></i></label>
+        </details>
+        <div class="configuration-heading"><div><span>2</span><div><b>Choose execution authority</b><small>Decide whether agents may act or only recommend.</small></div></div></div>
         <div class="mode-choice"><label class="selected"><input type="radio" name="mode" value="execute" checked /><span><b>Execute within authority</b><small>Release safe plans automatically; route exceptions to people.</small></span></label><label><input type="radio" name="mode" value="recommend" /><span><b>Recommend only</b><small>Generate complete plans without operational mutation.</small></span></label></div>
         <div class="dialog-note"><b>Hard constraints remain enforced</b><span>Inventory, promise, safety, customs, and authorization are deterministic and cannot be overridden by agents.</span></div>
         <div class="dialog-actions"><button value="cancel" class="secondary-action">Cancel</button><button value="confirm" id="confirm-run" class="primary-action">Start orchestration <span>→</span></button></div>
