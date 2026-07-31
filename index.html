@@ -9,7 +9,7 @@
       content="PROJECT OVERSEER — an explainable agentic fulfillment control centre."
     />
     <title>PROJECT OVERSEER · FlowShip Fulfillment</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=9" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to operations</a>
@@ -81,6 +81,23 @@
               </ol>
             </section>
 
+            <section class="architecture-showcase" aria-labelledby="architecture-title">
+              <div class="showcase-heading"><div><p class="eyebrow">VISIBLE AGENT ARCHITECTURE</p><h2 id="architecture-title">How agents drive every order decision</h2><p>This is the execution path you will watch for each order. The highlighted node shows exactly where work is happening or stopped.</p></div><button class="secondary-action" data-go="agents">Review agent setup →</button></div>
+              <div class="decision-flowchart">
+                <div class="flow-node entry"><span>ORDER</span><b>Order received</b><small>Customer promise locked</small></div>
+                <i class="flow-arrow">→</i>
+                <div class="flow-node orchestration"><span>ORCHESTRATION AGENT</span><b>Coordinator chooses workflow</b><small>Planning, shortage, or recovery</small></div>
+                <i class="flow-arrow">→</i>
+                <div class="flow-node goal"><span>GOAL AGENT</span><b>Planning Lead manages checks</b><small>Requires complete evidence</small></div>
+                <i class="flow-arrow">→</i>
+                <div class="flow-node tasks"><span>8 TASK AGENTS</span><b>Specialists return facts</b><small>Inventory · carrier · cost · safety</small></div>
+                <i class="flow-arrow">→</i>
+                <div class="flow-node gate highlighted"><span>DECISION GATE</span><b>Rules and authority decide</b><small>Continue automatically or ask a person</small></div>
+                <div class="flow-branch success-branch"><i>↘</i><div><span>SAFE + AUTHORIZED</span><b>Ready to fulfill</b><small>No user action required</small></div></div>
+                <div class="flow-branch help-branch"><i>↙</i><div><span>LIMIT OR EXCEPTION</span><b>Human decision required</b><small>Stopping agent and suggested actions shown</small></div></div>
+              </div>
+            </section>
+
             <section class="results-report hidden" id="results-report">
               <div class="report-head">
                 <div><span class="success-check">✓</span><div><p class="eyebrow">BATCH RESULTS · JUST COMPLETED</p><h2>Here’s what the agents achieved</h2><p id="report-sentence">Orders were evaluated against service, cost, and safety constraints.</p></div></div>
@@ -91,6 +108,7 @@
                 <article><span>Automatically completed</span><strong id="result-released">0 / 0</strong><small>Target: at least 70%</small><div class="target-track"><i id="auto-track"></i></div></article>
                 <article><span>Delivery promises protected</span><strong id="result-promises">0</strong><small>Target: 100% of feasible orders</small><div class="target-track"><i id="promise-track"></i></div></article>
               </div>
+              <div class="decision-board"><div class="report-section-title"><h3>Final decision for every order</h3><span>Open any row to see its highlighted agent path</span></div><div id="decision-board-rows"></div></div>
               <div class="report-bottom">
                 <div class="issue-summary"><div class="report-section-title"><h3>Biggest issues to address</h3><span>Prioritized by customer impact</span></div><div id="top-issues"></div></div>
                 <div class="report-explainer"><h3>How savings are calculated</h3><p>For each promise-feasible order, OVERSEER compares the selected plan with the fastest feasible alternative. Savings are transportation and fulfillment cost avoided—not invented revenue.</p><button data-go="audit">View calculation evidence →</button></div>
@@ -273,6 +291,6 @@
       </form>
     </dialog>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js"></script>
+    <script src="./app.js?v=9"></script>
   </body>
 </html>

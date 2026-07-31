@@ -125,8 +125,17 @@ function renderResults(processed){
   const visibleIssues=issues.length?issues:[["No material exceptions","All selected orders stayed within automatic authority.","runs"]];
   $("#top-issues").innerHTML=visibleIssues.slice(0,3).map((x,i)=>`<div class="issue-row"><span class="issue-rank">${i+1}</span><div><strong>${x[0]}</strong><small>${x[1]}</small></div><button data-issue-go="${x[2]}">Review →</button></div>`).join("");
   $$("[data-issue-go]").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.issueGo)));
+  $("#decision-board-rows").innerHTML=processed.map(o=>{
+    const run=state.runs.find(r=>r.id===o.id);
+    const needsHelp=["Awaiting approval","Held","Recommended"].includes(o.status);
+    const stoppedBy=o.status==="Awaiting approval"?"Authority gate":o.status==="Held"&&o.index===4?"Inventory task agent → Goal agent":o.status==="Held"&&o.index===8?"Carrier task agent → Goal agent":o.status==="Recommended"?"Recommend-only control":"No stop — all checks passed";
+    const action=o.status==="Awaiting approval"?"Approve, compare, or pause":o.status==="Held"&&o.index===4?"Review transfer or wait for stock":o.status==="Held"?"Review safe options or correct data":o.status==="Recommended"?"Review and approve":"Warehouse can begin fulfillment";
+    return `<button class="decision-board-row ${needsHelp?"needs-help":"cleared"}" data-open-run="${o.id}"><span class="decision-symbol">${needsHelp?"!":"✓"}</span><div><b>${o.id} · ${escapeHtml(o.merchant)}</b><small>${escapeHtml(friendlyStatus(o.status))}</small></div><div><span>STOPPED BY</span><b>${stoppedBy}</b></div><div><span>SUGGESTED ACTION</span><b>${action}</b></div><em>View flow →</em></button>`;
+  }).join("");
+  $$("[data-open-run]").forEach(button=>button.addEventListener("click",()=>{state.activeRunId=button.dataset.openRun;navigate("runs");renderRuns();}));
   $("#results-report").classList.remove("hidden");
   $("#start-here").classList.add("hidden");
+  $(".architecture-showcase").classList.add("hidden");
 }
 function toast(message){const el=$("#toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2600);}
 function renderIntake(){
@@ -357,6 +366,7 @@ function reset(){
   state.orders=ORDER_SEED.map((o,i)=>({id:o[0],merchant:o[1],destination:o[2],profile:o[3],promise:o[4],signal:o[5],signalState:o[6],selected:false,status:"Awaiting orchestration",allocation:"—",carrier:"—",decision:"Pending",index:i}));
   state.runs=[];state.approvals=[];state.audit=[{time:"14:32:08.441",title:"Simulation baseline verified",body:"Seed overseer-demo-v1 restored with all business invariants passing.",code:"simulation.baseline_verified"}];
   $("#results-report").classList.add("hidden");$("#start-here").classList.remove("hidden");
+  $(".architecture-showcase").classList.remove("hidden");
   $("#run-complete-bar").classList.add("hidden");
   renderAll();navigate("command");toast("Simulation restored to overseer-demo-v1");
 }
