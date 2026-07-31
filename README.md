@@ -22,6 +22,9 @@ The honest assessment of what is still required before a company can use this
 for live fulfillment is in
 [`docs/production-readiness-review.md`](docs/production-readiness-review.md).
 
+The measured efficiency, design benchmark, and requirement-coverage audit is in
+[`docs/efficiency-and-design-review.md`](docs/efficiency-and-design-review.md).
+
 ## GitHub Pages
 
 The included Pages workflow publishes the repository root when `main` or `master` is pushed and Pages is configured to use **GitHub Actions** as its source.
