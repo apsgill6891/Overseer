@@ -32,6 +32,15 @@ These are principles, not copied visual treatments:
   heights, support selection and batch actions, and progressively disclose
   supplementary information through expansion or a dedicated panel.
   Source: [Carbon data-table guidance](https://carbondesignsystem.com/components/data-table/usage/).
+- **Palantir Foundry/Workshop:** center operational applications on governed
+  business objects and actions rather than passive dashboards; provide an inbox,
+  detailed task/object view, explicit permissioned writeback actions, workflow
+  lineage, and traces containing duration, inputs, outputs, and errors. OVERSEER
+  now treats each order as the primary operational object and separates Decision,
+  Workflow Lineage, Agent Trace, and Writeback Preview.
+  Sources: [operational applications](https://www.palantir.com/docs/foundry/app-building/operational-apps),
+  [Workshop application patterns](https://www.palantir.com/docs/foundry/workshop/example-applications),
+  and [observability and tracing](https://www.palantir.com/docs/foundry/observability/overview).
 
 ## Requirement coverage
 
