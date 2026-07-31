@@ -195,27 +195,67 @@
     </div>
 
     <dialog id="run-dialog">
-      <form method="dialog">
-        <div class="dialog-head"><span class="dialog-icon">↯</span><div><p class="eyebrow">EXECUTION CONFIRMATION</p><h2>Run fulfillment agents</h2></div><button value="cancel" aria-label="Close">×</button></div>
-        <p id="dialog-copy"></p>
-        <div class="configuration-heading"><div><span>1</span><div><b>Choose the operating goal</b><small>A recommended setup is selected. You can change it before execution.</small></div></div><span class="recommended-badge">RECOMMENDED</span></div>
-        <div class="goal-presets">
-          <label class="selected"><input type="radio" name="goalPreset" value="balanced" checked /><span><b>Balanced</b><small>Protect promises while controlling cost</small></span></label>
-          <label><input type="radio" name="goalPreset" value="service" /><span><b>Service first</b><small>Maximize delivery confidence</small></span></label>
-          <label><input type="radio" name="goalPreset" value="cost" /><span><b>Cost first</b><small>Use the lowest-cost promise-safe plan</small></span></label>
+      <form method="dialog" class="preflight-form">
+        <div class="dialog-head"><span class="dialog-icon">✓</span><div><p class="eyebrow">PRE-EXECUTION REVIEW</p><h2>Review your agent team before it starts</h2></div><button value="cancel" aria-label="Close">×</button></div>
+        <div class="wizard-progress" aria-label="Review progress">
+          <button type="button" class="active" data-wizard-go="1"><b>1</b><span>Outcome</span></button>
+          <i></i><button type="button" data-wizard-go="2"><b>2</b><span>Agent team</span></button>
+          <i></i><button type="button" data-wizard-go="3"><b>3</b><span>Limits</span></button>
+          <i></i><button type="button" data-wizard-go="4"><b>4</b><span>Confirm</span></button>
         </div>
-        <details class="agent-controls">
-          <summary>Adjust agent limits <span>Optional</span></summary>
-          <div class="control-row"><label for="confidence-limit"><b>Minimum delivery confidence</b><small>Agent must escalate below this level</small></label><output id="confidence-output">90%</output><input id="confidence-limit" type="range" min="80" max="99" value="90" /></div>
-          <div class="control-row"><label for="cost-limit"><b>Automatic shipping-cost limit</b><small>Higher-cost choices require your approval</small></label><output id="cost-output">$35</output><input id="cost-limit" type="range" min="15" max="80" step="5" value="35" /></div>
-          <label class="switch-row"><span><b>Allow split shipments</b><small>Only when needed to protect the promise</small></span><input id="allow-split" type="checkbox" checked /><i></i></label>
-          <label class="switch-row"><span><b>Allow air upgrades</b><small>Still subject to the cost limit above</small></span><input id="allow-air" type="checkbox" checked /><i></i></label>
-          <label class="switch-row"><span><b>Start recovery automatically</b><small>Replan when a carrier disruption occurs</small></span><input id="allow-recovery" type="checkbox" checked /><i></i></label>
-        </details>
-        <div class="configuration-heading"><div><span>2</span><div><b>Choose execution authority</b><small>Decide whether agents may act or only recommend.</small></div></div></div>
-        <div class="mode-choice"><label class="selected"><input type="radio" name="mode" value="execute" checked /><span><b>Execute within authority</b><small>Release safe plans automatically; route exceptions to people.</small></span></label><label><input type="radio" name="mode" value="recommend" /><span><b>Recommend only</b><small>Generate complete plans without operational mutation.</small></span></label></div>
-        <div class="dialog-note"><b>Hard constraints remain enforced</b><span>Inventory, promise, safety, customs, and authorization are deterministic and cannot be overridden by agents.</span></div>
-        <div class="dialog-actions"><button value="cancel" class="secondary-action">Cancel</button><button value="confirm" id="confirm-run" class="primary-action">Start orchestration <span>→</span></button></div>
+
+        <section class="wizard-page active" data-wizard-page="1">
+          <p class="wizard-intro" id="dialog-copy"></p>
+          <h3>What outcome should the team prioritize?</h3>
+          <p class="plain-help">All options still protect inventory, safety, and the customer’s promised date. This choice tells agents how to choose between safe plans.</p>
+          <div class="goal-presets large">
+            <label class="selected"><input type="radio" name="goalPreset" value="balanced" checked /><span><b>Balanced <em>Recommended</em></b><small>Keep delivery reliable without paying for speed that is not needed.</small><strong>Best for everyday orders</strong></span></label>
+            <label><input type="radio" name="goalPreset" value="service" /><span><b>Delivery first</b><small>Prefer the plan most likely to arrive on time, even when it costs more.</small><strong>Best for urgent or replacement orders</strong></span></label>
+            <label><input type="radio" name="goalPreset" value="cost" /><span><b>Cost first</b><small>Choose the least expensive plan that still meets every required promise.</small><strong>Best for economy orders</strong></span></label>
+          </div>
+        </section>
+
+        <section class="wizard-page" data-wizard-page="2">
+          <h3>Meet the three types of agents</h3>
+          <p class="plain-help">Think of this as one manager, one workflow lead, and a team of specialists. Review exactly what each may do.</p>
+          <div class="agent-team-review">
+            <article><span class="agent-number">1</span><div><p class="eyebrow">ORCHESTRATION AGENT · THE MANAGER</p><h4>Fulfillment Coordinator</h4><p>Chooses which workflow is needed, reacts when conditions change, pauses unsafe work, and asks you for decisions.</p><div class="permission-line"><b>May:</b> choose workflows, replan, pause, request approval</div><div class="permission-line no"><b>May not:</b> bypass a rule or approve its own exception</div></div><label class="review-check"><input type="checkbox" class="agent-enabled" data-agent="coordinator" checked /><span>Include</span></label></article>
+            <article><span class="agent-number">2</span><div><p class="eyebrow">GOAL AGENT · THE WORKFLOW LEAD</p><h4>Order Planning Lead</h4><p>Makes sure every required check is completed, compares valid plans, and recommends the most defensible option.</p><div class="permission-line"><b>May:</b> request specialist checks and recommend a plan</div><div class="permission-line no"><b>May not:</b> change inventory or create a shipment directly</div></div><label class="review-check"><input type="checkbox" class="agent-enabled" data-agent="planner" checked /><span>Include</span></label></article>
+            <article><span class="agent-number">3</span><div><p class="eyebrow">TASK AGENTS · THE SPECIALISTS</p><h4>Fact-checking team</h4><p>Each specialist answers one narrow question. Their calculations are deterministic and independently recorded.</p><div class="specialist-list"><label><input type="checkbox" checked disabled /> Order and payment</label><label><input type="checkbox" checked disabled /> Address and delivery area</label><label><input type="checkbox" checked disabled /> Inventory</label><label><input type="checkbox" checked disabled /> Facility capacity and cutoff</label><label><input type="checkbox" checked disabled /> Packaging and restrictions</label><label><input type="checkbox" checked disabled /> Carrier and delivery estimate</label><label><input type="checkbox" checked disabled /> Total expected cost</label><label><input type="checkbox" checked disabled /> Policy and authority</label></div></div><label class="review-check locked"><input type="checkbox" checked disabled /><span>Required</span></label></article>
+          </div>
+          <div class="dialog-note"><b>Why are specialist checks locked?</b><span>Removing a safety, inventory, cost, or promise check could create an invalid plan. You control priorities and authority—not whether evidence is collected.</span></div>
+        </section>
+
+        <section class="wizard-page" data-wizard-page="3">
+          <h3>Set the team’s limits</h3>
+          <p class="plain-help">The recommended values match the selected outcome. Tightening a limit sends more decisions to you; loosening it permits more automatic work.</p>
+          <div class="limits-grid">
+            <div class="control-row"><label for="confidence-limit"><b>Required chance of on-time delivery</b><small>Below this, agents must ask you what to do.</small></label><output id="confidence-output">90%</output><input id="confidence-limit" type="range" min="80" max="99" value="90" /></div>
+            <div class="control-row"><label for="cost-limit"><b>Maximum cost agents may approve</b><small>Plans above this amount require your approval.</small></label><output id="cost-output">$35</output><input id="cost-limit" type="range" min="15" max="80" step="5" value="35" /></div>
+          </div>
+          <div class="permission-switches">
+            <label class="switch-row"><span><b>Permit more than one shipment</b><small>Use two facilities only when one cannot protect the delivery promise.</small></span><input id="allow-split" type="checkbox" checked /><i></i></label>
+            <label class="switch-row"><span><b>Permit faster air service</b><small>Use air only when needed and within your cost limit.</small></span><input id="allow-air" type="checkbox" checked /><i></i></label>
+            <label class="switch-row"><span><b>React automatically to delivery disruption</b><small>Let the manager start a new recovery plan; expensive actions still return to you.</small></span><input id="allow-recovery" type="checkbox" checked /><i></i></label>
+          </div>
+          <h3 class="authority-title">What may happen after planning?</h3>
+          <div class="mode-choice"><label class="selected"><input type="radio" name="mode" value="execute" checked /><span><b>Continue safe orders automatically</b><small>Create the fulfillment plan when it stays inside every limit; bring exceptions to me.</small></span></label><label><input type="radio" name="mode" value="recommend" /><span><b>Show recommendations only</b><small>Do not change any order. I will review every recommendation first.</small></span></label></div>
+        </section>
+
+        <section class="wizard-page" data-wizard-page="4">
+          <h3>Final review</h3>
+          <p class="plain-help">This is the exact instruction the agent team will receive. Nothing begins until you confirm.</p>
+          <div class="confirmation-card" id="confirmation-card"></div>
+          <div class="dialog-note"><b>Controls that always remain active</b><span>No negative or double-counted inventory · no silent delivery-date extension · no unsafe carrier or package · no action outside your authority · every decision recorded.</span></div>
+        </section>
+
+        <div class="wizard-actions">
+          <button type="button" id="wizard-back" class="secondary-action hidden">← Back</button>
+          <span></span>
+          <button value="cancel" class="secondary-action">Cancel</button>
+          <button type="button" id="wizard-next" class="primary-action">Review agent team <span>→</span></button>
+          <button value="confirm" id="confirm-run" class="primary-action hidden">Confirm and start <span>→</span></button>
+        </div>
       </form>
     </dialog>
     <dialog id="tour-dialog">

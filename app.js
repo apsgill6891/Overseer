@@ -1,14 +1,14 @@
 const ORDER_SEED = [
-  ["FS-10422","PulseTech","Toronto, ON","Prime","Jul 31 · 20:00","Normal Prime","ready"],
-  ["FS-10423","Hearth & Hue","Ottawa, ON","Standard","Aug 3 · 20:00","Ground feasible","ready"],
-  ["FS-10424","Northstar","Calgary, AB","Economy","Aug 6 · 20:00","Several FCs feasible","ready"],
-  ["FS-10425","Northstar","Montréal, QC","Standard","Aug 3 · 20:00","Closest FC cutoff missed","attention"],
-  ["FS-10426","PulseTech","Edmonton, AB","Standard","Aug 4 · 20:00","Network inventory shortage","danger"],
-  ["FS-10427","Hearth & Hue","Halifax, NS","Prime","Aug 2 · 20:00","Split shipment analysis","attention"],
-  ["FS-10428","PulseTech","Vancouver, BC","Prime","Aug 1 · 20:00","Cross-border stock only","attention"],
-  ["FS-10429","Northstar","Iqaluit, NU","Merchant Priority","Aug 2 · 20:00","Air upgrade approval","attention"],
-  ["FS-10430","PulseTech","Seattle, WA","Standard","Aug 4 · 20:00","Lithium restriction","attention"],
-  ["FS-10431","Hearth & Hue","Columbus, OH","Replacement","Aug 1 · 20:00","Later carrier disruption","ready"]
+  ["FS-10422","PulseTech","Toronto, ON","Prime","Jul 31 · 20:00","Routine urgent order","ready"],
+  ["FS-10423","Hearth & Hue","Ottawa, ON","Standard","Aug 3 · 20:00","Routine delivery","ready"],
+  ["FS-10424","Northstar","Calgary, AB","Economy","Aug 6 · 20:00","Several warehouses can fulfill it","ready"],
+  ["FS-10425","Northstar","Montréal, QC","Standard","Aug 3 · 20:00","Nearest warehouse missed pickup","attention"],
+  ["FS-10426","PulseTech","Edmonton, AB","Standard","Aug 4 · 20:00","Not enough stock in the network","danger"],
+  ["FS-10427","Hearth & Hue","Halifax, NS","Prime","Aug 2 · 20:00","May need two separate shipments","attention"],
+  ["FS-10428","PulseTech","Vancouver, BC","Prime","Aug 1 · 20:00","Required stock is in another country","attention"],
+  ["FS-10429","Northstar","Iqaluit, NU","Merchant Priority","Aug 2 · 20:00","Faster shipping exceeds the cost limit","attention"],
+  ["FS-10430","PulseTech","Seattle, WA","Standard","Aug 4 · 20:00","Battery requires special shipping","attention"],
+  ["FS-10431","Hearth & Hue","Columbus, OH","Replacement","Aug 1 · 20:00","Carrier problem will require recovery","ready"]
 ];
 const AGENTS = [
   ["OR","Fulfillment Orchestrator","ORCHESTRATION · v1.0.0","Selects goals, evaluates results, replans after changed conditions, and routes human authority.","Deterministic reference","Nominal"],
@@ -58,6 +58,37 @@ const friendlyStatus = status => ({
   "Held":"Paused — action needed",
   "Recommended":"Recommendation ready"
 }[status]||status);
+const goalName = value => ({balanced:"Balanced",service:"Delivery first",cost:"Cost first"}[value]||value);
+let wizardStep=1;
+function showWizardStep(step){
+  wizardStep=Math.max(1,Math.min(4,step));
+  $$(".wizard-page").forEach(page=>page.classList.toggle("active",Number(page.dataset.wizardPage)===wizardStep));
+  $$("[data-wizard-go]").forEach(button=>{
+    const n=Number(button.dataset.wizardGo);
+    button.classList.toggle("active",n===wizardStep);
+    button.classList.toggle("complete",n<wizardStep);
+  });
+  $("#wizard-back").classList.toggle("hidden",wizardStep===1);
+  $("#wizard-next").classList.toggle("hidden",wizardStep===4);
+  $("#confirm-run").classList.toggle("hidden",wizardStep!==4);
+  const nextLabels={1:"Review agent team",2:"Set limits",3:"Final review"};
+  if(wizardStep<4)$("#wizard-next").innerHTML=`${nextLabels[wizardStep]} <span>→</span>`;
+  if(wizardStep===4)renderConfirmation();
+}
+function renderConfirmation(){
+  const preset=$('input[name="goalPreset"]:checked').value;
+  const mode=$('input[name="mode"]:checked').value;
+  const missing=$$(".agent-enabled").filter(input=>!input.checked);
+  $("#confirmation-card").innerHTML=`
+    <div><span>Orders included</span><strong>${state.orders.filter(o=>o.selected).length}</strong></div>
+    <div><span>Business outcome</span><strong>${goalName(preset)}</strong><small>${preset==="balanced"?"Balance reliable delivery and cost":preset==="service"?"Prefer the strongest on-time plan":"Prefer the lowest-cost safe plan"}</small></div>
+    <div><span>Agent team</span><strong>${missing.length?"Incomplete":"Coordinator + planning lead + 8 specialists"}</strong><small>${missing.length?"Return to Agent team and include the required roles":"All required evidence checks included"}</small></div>
+    <div><span>Agents must ask you when</span><strong>Confidence is below ${$("#confidence-limit").value}% or cost is above $${$("#cost-limit").value}</strong></div>
+    <div><span>Special permissions</span><strong>${[$("#allow-split").checked?"Multiple shipments":null,$("#allow-air").checked?"Air service":null,$("#allow-recovery").checked?"Automatic recovery":null].filter(Boolean).join(" · ")||"None"}</strong></div>
+    <div><span>After planning</span><strong>${mode==="execute"?"Continue safe orders automatically":"Show recommendations only"}</strong></div>`;
+  $("#confirm-run").disabled=missing.length>0;
+  $("#confirm-run").title=missing.length?"The coordinator and planning lead are required to run this workflow":"";
+}
 
 function navigate(view){
   $$(".view").forEach(v=>v.classList.toggle("active",v.dataset.viewPanel===view));
@@ -146,7 +177,7 @@ function renderRuns(){
   $("#runs-empty").classList.toggle("hidden",state.runs.length>0);
   $("#runs-layout").classList.toggle("hidden",!state.runs.length);
   if(!state.runs.length)return;
-  $("#run-list").innerHTML=state.runs.map((r,i)=>`<button class="run-list-item ${i===0?"active":""}" data-run="${r.id}"><div><strong>${r.id}</strong><span class="state-pill ${r.status==="Awaiting approval"?"attention":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></div><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.profile)}</p><small>${r.path}</small></button>`).join("");
+  $("#run-list").innerHTML=state.runs.map((r,i)=>`<button class="run-list-item ${i===0?"active":""}" data-run="${r.id}"><div><strong>${r.id}</strong><span class="state-pill ${r.status==="Awaiting approval"?"attention":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></div><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.profile)}</p><small>${friendlyStatus(r.status)==="Ready to fulfill"?"Planning finished — fulfillment can begin":friendlyStatus(r.status)}</small></button>`).join("");
   $$(".run-list-item").forEach(b=>b.addEventListener("click",()=>{$$(".run-list-item").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderRunDetail(state.runs.find(r=>r.id===b.dataset.run));}));
   renderRunDetail(state.runs[0]);
 }
@@ -154,8 +185,8 @@ function renderRunDetail(r){
   const isApproval=r.status==="Awaiting approval", isHold=r.status==="Held";
   $("#run-detail").innerHTML=`<div class="run-summary"><div><p class="eyebrow">ORCHESTRATION RUN · ${r.runId}</p><h2>${r.id}</h2><p>${escapeHtml(r.merchant)} · ${escapeHtml(r.destination)} · ${escapeHtml(r.profile)}</p><small class="run-config">Your setup: ${escapeHtml(r.configuration||"Recommended defaults")}</small></div><div class="run-kpis"><div><span>Plan time</span><b>${r.time}</b></div><div><span>Alternatives</span><b>${r.alternatives}</b></div><div><span>Decision</span><b>${isApproval?"YOU":isHold?"PAUSED":"AUTO"}</b></div></div></div>
   <div class="hierarchy">
-    <div class="step"><span class="step-icon">O</span><h3>Fulfillment Orchestrator <span class="state-pill ready">Succeeded</span></h3><p>Selected ${r.goal}; pinned ${escapeHtml(r.profile)} profile v1.0 and guardrails v1.0.</p></div>
-    <div class="step"><span class="step-icon">G</span><h3>${r.goal} <span class="state-pill ${isHold?"danger":"ready"}">${isHold?"Escalated":"Completed"}</span></h3><p>All mandatory checks returned current, schema-valid evidence.</p><div class="task-chips"><span>✓ Order validation</span><span>✓ Address zone</span><span>✓ Inventory ATP</span><span>✓ Capacity / cutoff</span><span>✓ Packaging</span><span>✓ Carrier services</span><span>✓ Delivery estimate</span><span>✓ Policy authority</span></div></div>
+    <div class="step"><span class="step-icon">1</span><h3>Fulfillment Coordinator <small>Orchestration agent</small> <span class="state-pill ready">Finished</span></h3><p>Chose the correct planning workflow, applied your ${goalName(state.runConfig.goal)} outcome, and checked whether a human decision was needed.</p></div>
+    <div class="step"><span class="step-icon">2</span><h3>Order Planning Lead <small>Goal agent</small> <span class="state-pill ${isHold?"danger":"ready"}">${isHold?"Needs help":"Finished"}</span></h3><p>Made sure all eight specialist checks were completed before comparing plans.</p><div class="task-chips"><span>✓ Order is valid</span><span>✓ Address can be served</span><span>✓ Inventory is available</span><span>✓ Facility can meet cutoff</span><span>✓ Package is safe</span><span>✓ Carrier can accept it</span><span>✓ Delivery chance calculated</span><span>✓ Cost and limits checked</span></div></div>
     <div class="step"><span class="step-icon">D</span><h3>What happens next <span class="state-pill ${isApproval?"attention":isHold?"danger":"ready"}" title="System status: ${r.status}">${friendlyStatus(r.status)}</span></h3><p>${r.reason}</p></div>
   </div>
   <div class="plan-box"><h3>Recommended plan · evidence snapshot v1</h3><div class="plan-grid"><div><span>Allocation</span><b>${r.allocation}</b></div><div><span>Carrier service</span><b>${r.carrier}</b></div><div><span>Expected cost</span><b>${r.cost}</b></div><div><span>On-time confidence</span><b>${r.confidence}</b></div></div></div>`;
@@ -216,7 +247,7 @@ $$(".nav-item").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.vie
 $$("[data-go]").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.go)));
 $("#select-all").addEventListener("click",()=>{state.orders.forEach(o=>o.selected=true);renderIntake();});
 $("#master-check").addEventListener("change",e=>{state.orders.forEach(o=>o.selected=e.target.checked);renderIntake();});
-$("#run-agents").addEventListener("click",()=>{const n=state.orders.filter(o=>o.selected).length;if(!n){toast("Select at least one order first");return;}$("#dialog-copy").textContent=`${n} selected order${n>1?"s":""} will receive independent orchestration runs. Profiles are assigned from the accepted checkout service and merchant policy.`;$("#run-dialog").showModal();});
+$("#run-agents").addEventListener("click",()=>{const n=state.orders.filter(o=>o.selected).length;if(!n){toast("Select at least one order first");return;}$("#dialog-copy").textContent=`You selected ${n} order${n>1?"s":""}. Before anything begins, choose the outcome you want, review every agent and its permissions, then set the limits that require your decision.`;showWizardStep(1);$("#run-dialog").showModal();});
 $("#run-dialog").addEventListener("close",()=>{if($("#run-dialog").returnValue==="confirm")beginRuns($('input[name="mode"]:checked').value);});
 $("#order-search").addEventListener("input",renderOrders);
 $("#reset-button").addEventListener("click",()=>{if(confirm("Reset all mutable simulation state to overseer-demo-v1?"))reset();});
@@ -230,6 +261,10 @@ $$('input[name="goalPreset"]').forEach(input=>input.addEventListener("change",()
   $("#confidence-limit").value=preset[0];$("#confidence-output").textContent=`${preset[0]}%`;
   $("#cost-limit").value=preset[1];$("#cost-output").textContent=`$${preset[1]}`;
 }));
+$("#wizard-next").addEventListener("click",()=>showWizardStep(wizardStep+1));
+$("#wizard-back").addEventListener("click",()=>showWizardStep(wizardStep-1));
+$$("[data-wizard-go]").forEach(button=>button.addEventListener("click",()=>showWizardStep(Number(button.dataset.wizardGo))));
+$$(".agent-enabled").forEach(input=>input.addEventListener("change",()=>{if(wizardStep===4)renderConfirmation();}));
 $("#tour-button").addEventListener("click",()=>$("#tour-dialog").showModal());
 $("#tour-dialog").addEventListener("close",()=>{if($("#tour-dialog").returnValue==="start")navigate("intake");});
 $$("[data-recovery]").forEach(b=>b.addEventListener("click",()=>{audit("Recovery workflow started","FS-10421 disruption reassessed against remaining customer promise.","goal.delivery_recovery_started");navigate("audit");toast("Delivery recovery workflow started");}));
