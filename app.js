@@ -56,6 +56,27 @@ function navigate(view){
   $$(".nav-item").forEach(v=>v.classList.toggle("active",v.dataset.view===view));
   window.scrollTo({top:0,behavior:"smooth"});
 }
+function renderResults(processed){
+  if(!processed.length)return;
+  const released=processed.filter(o=>o.status==="Released"||o.status==="Recommended").length;
+  const protectedPromises=processed.filter(o=>o.status!=="Held").length;
+  const savings=processed.reduce((sum,o)=>sum+[8.4,6.2,15.8,11.7,0,4.9,12.1,18.6,0,7.4][o.index],0);
+  $("#result-savings").textContent=`$${savings.toFixed(2)}`;
+  $("#result-released").textContent=`${released} / ${processed.length}`;
+  $("#result-promises").textContent=protectedPromises;
+  $("#result-time").textContent=`${processed.length*7} min`;
+  $("#report-sentence").textContent=`${processed.length} orders evaluated. ${released} required no human work; ${processed.length-released} need review or corrective action.`;
+  const issues=[];
+  if(processed.some(o=>o.index===4))issues.push(["Inventory shortage","Network stock is unavailable after protected safety stock.","orders"]);
+  if(processed.some(o=>[5,7].includes(o.index)))issues.push(["Cost authority exceeded","An air upgrade or split needs human approval.","approvals"]);
+  if(processed.some(o=>o.index===8))issues.push(["Carrier restriction","Lithium handling removes the available air option.","orders"]);
+  if(processed.some(o=>o.index===3))issues.push(["Missed facility cutoff","Earlier planning may avoid cross-border recovery cost.","runs"]);
+  const visibleIssues=issues.length?issues:[["No material exceptions","All selected orders stayed within automatic authority.","runs"]];
+  $("#top-issues").innerHTML=visibleIssues.slice(0,3).map((x,i)=>`<div class="issue-row"><span class="issue-rank">${i+1}</span><div><strong>${x[0]}</strong><small>${x[1]}</small></div><button data-issue-go="${x[2]}">Review →</button></div>`).join("");
+  $$("[data-issue-go]").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.issueGo)));
+  $("#results-report").classList.remove("hidden");
+  $("#start-here").classList.add("hidden");
+}
 function toast(message){const el=$("#toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2600);}
 function renderIntake(){
   $("#orders-body").innerHTML=state.orders.map(o=>`<tr class="${o.selected?"selected":""}">
@@ -154,11 +175,13 @@ function beginRuns(mode){
   updateCounts();renderIntake();renderRuns();renderApprovals();renderOrders();
   $("#stat-completed").textContent=38+selected.length;
   $("#stat-auto").textContent=`${Math.round(state.orders.filter(o=>o.status==="Released").length/Math.max(1,selected.length)*100)}%`;
-  navigate("runs");toast(`${selected.length} independent orchestration runs completed`);
+  renderResults(selected);
+  navigate("command");toast(`${selected.length} orders planned — outcome summary is ready`);
 }
 function reset(){
   state.orders=ORDER_SEED.map((o,i)=>({id:o[0],merchant:o[1],destination:o[2],profile:o[3],promise:o[4],signal:o[5],signalState:o[6],selected:false,status:"Awaiting orchestration",allocation:"—",carrier:"—",decision:"Pending",index:i}));
   state.runs=[];state.approvals=[];state.audit=[{time:"14:32:08.441",title:"Simulation baseline verified",body:"Seed overseer-demo-v1 restored with all business invariants passing.",code:"simulation.baseline_verified"}];
+  $("#results-report").classList.add("hidden");$("#start-here").classList.remove("hidden");
   renderAll();navigate("command");toast("Simulation restored to overseer-demo-v1");
 }
 function renderAll(){renderIntake();renderOrders();renderAgents();renderGoals();renderPolicy();renderApprovals();renderAudit();renderRuns();updateCounts();}
@@ -172,5 +195,7 @@ $("#run-dialog").addEventListener("close",()=>{if($("#run-dialog").returnValue==
 $("#order-search").addEventListener("input",renderOrders);
 $("#reset-button").addEventListener("click",()=>{if(confirm("Reset all mutable simulation state to overseer-demo-v1?"))reset();});
 $("#profile-button").addEventListener("click",()=>toast("Role: Orchestration Overseer · Full operational scope"));
+$("#tour-button").addEventListener("click",()=>$("#tour-dialog").showModal());
+$("#tour-dialog").addEventListener("close",()=>{if($("#tour-dialog").returnValue==="start")navigate("intake");});
 $$("[data-recovery]").forEach(b=>b.addEventListener("click",()=>{audit("Recovery workflow started","FS-10421 disruption reassessed against remaining customer promise.","goal.delivery_recovery_started");navigate("audit");toast("Delivery recovery workflow started");}));
 renderAll();

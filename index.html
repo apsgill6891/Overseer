@@ -61,13 +61,44 @@
         <main id="main">
           <section class="view active" data-view-panel="command">
             <div class="page-heading">
-              <div><p class="eyebrow">THURSDAY · JUL 30</p><h1>Command Centre</h1><p>Focus on what needs judgment. The network is otherwise operating normally.</p></div>
-              <button class="primary-action" data-go="intake">Review new orders <span>→</span></button>
+              <div><p class="eyebrow">THURSDAY · JUL 30</p><h1>Your operations briefing</h1><p>See what needs attention, what the agents achieved, and the next action to take.</p></div>
+              <button class="help-button" id="tour-button"><span>?</span> How this works</button>
             </div>
+
+            <section class="start-here" id="start-here">
+              <div class="start-copy">
+                <span class="start-label">START HERE</span>
+                <h2>Plan today’s new orders in under a minute</h2>
+                <p>OVERSEER checks inventory, facilities, packaging, carriers, delivery promises, and policies—then releases safe orders and brings only the exceptions to you.</p>
+                <button class="primary-action" data-go="intake">Start with 10 new orders <span>→</span></button>
+              </div>
+              <ol class="journey">
+                <li class="current"><b>1</b><span><strong>Select orders</strong><small>Review the incoming batch</small></span></li>
+                <li><b>2</b><span><strong>Run agents</strong><small>Watch checks and decisions</small></span></li>
+                <li><b>3</b><span><strong>Review results</strong><small>See savings and exceptions</small></span></li>
+              </ol>
+            </section>
+
+            <section class="results-report hidden" id="results-report">
+              <div class="report-head">
+                <div><span class="success-check">✓</span><div><p class="eyebrow">BATCH RESULTS · JUST COMPLETED</p><h2>Here’s what the agents achieved</h2><p id="report-sentence">Orders were evaluated against service, cost, and safety constraints.</p></div></div>
+                <button class="secondary-action" data-go="runs">Inspect decisions →</button>
+              </div>
+              <div class="value-grid">
+                <article><span>Estimated shipping savings</span><strong id="result-savings">$0.00</strong><small>versus fastest feasible plans</small></article>
+                <article><span>Orders auto-released</span><strong id="result-released">0 / 0</strong><small>no human work required</small></article>
+                <article><span>Promises protected</span><strong id="result-promises">0</strong><small>within required confidence</small></article>
+                <article><span>Manual planning avoided</span><strong id="result-time">0 min</strong><small>estimated operator time</small></article>
+              </div>
+              <div class="report-bottom">
+                <div class="issue-summary"><div class="report-section-title"><h3>Biggest issues to address</h3><span>Prioritized by customer impact</span></div><div id="top-issues"></div></div>
+                <div class="report-explainer"><h3>How savings are calculated</h3><p>For each promise-feasible order, OVERSEER compares the selected plan with the fastest feasible alternative. Savings are transportation and fulfillment cost avoided—not invented revenue.</p><button data-go="audit">View calculation evidence →</button></div>
+              </div>
+            </section>
 
             <section class="attention-panel">
               <div class="section-heading">
-                <div><span class="pulse-icon">!</span><div><h2>Needs your attention</h2><p>Exceptions and decisions ordered by operational urgency</p></div></div>
+                <div><span class="pulse-icon">!</span><div><h2>What needs your attention now</h2><p>Plain-language exceptions ordered by customer and operational impact</p></div></div>
                 <span class="updated">Updated just now</span>
               </div>
               <div class="attention-grid">
@@ -105,9 +136,10 @@
 
           <section class="view" data-view-panel="intake">
             <div class="page-heading compact">
-              <div><p class="eyebrow">BATCH · INTAKE-0730-B</p><h1>Order Intake</h1><p>Ten intentionally varied orders are ready for orchestration.</p></div>
+              <div><p class="eyebrow">STEP 1 OF 3 · SELECT ORDERS</p><h1>Choose orders to plan</h1><p>Select any orders below—or use “Select all”—then run the agents.</p></div>
               <div class="heading-actions"><button class="secondary-action" id="select-all">Select all</button><button class="primary-action" id="run-agents">Run agents <span>↯</span></button></div>
             </div>
+            <div class="instruction-strip"><b>What happens next?</b><span>Each selected order gets its own plan. Safe decisions can release automatically; costly, unsafe, or uncertain decisions come back to you.</span></div>
             <div class="table-card">
               <div class="table-tools"><label><input type="checkbox" id="master-check" /> <span id="selection-label">0 selected</span></label><div><span class="legend"><i class="det"></i> Deterministic core</span><span class="legend"><i class="human"></i> Human gate likely</span></div></div>
               <div class="table-scroll"><table><thead><tr><th></th><th>Order</th><th>Merchant</th><th>Destination</th><th>Profile</th><th>Promise</th><th>Scenario signal</th><th>Status</th></tr></thead><tbody id="orders-body"></tbody></table></div>
@@ -115,7 +147,7 @@
           </section>
 
           <section class="view" data-view-panel="runs">
-            <div class="page-heading compact"><div><p class="eyebrow">EXECUTION MONITOR</p><h1>Live Runs</h1><p>Independent order lifecycles, coordinated through one auditable hierarchy.</p></div><span class="live-pill"><i></i> LIVE</span></div>
+            <div class="page-heading compact"><div><p class="eyebrow">STEP 2 OF 3 · UNDERSTAND DECISIONS</p><h1>See what the agents decided</h1><p>Choose an order on the left. Its checks, recommendation, and reason appear on the right.</p></div><span class="live-pill"><i></i> LIVE</span></div>
             <div id="runs-empty" class="empty-state"><span>↯</span><h2>No agent runs yet</h2><p>Select orders from Order Intake and run the agents to observe execution.</p><button class="primary-action" data-go="intake">Go to Order Intake</button></div>
             <div id="runs-layout" class="runs-layout hidden">
               <div class="run-list" id="run-list"></div>
@@ -144,7 +176,7 @@
           </section>
 
           <section class="view" data-view-panel="approvals">
-            <div class="page-heading compact"><div><p class="eyebrow">HUMAN AUTHORITY</p><h1>Approval Queue</h1><p>Decisions outside automatic-release boundaries.</p></div></div>
+            <div class="page-heading compact"><div><p class="eyebrow">STEP 3 OF 3 · HUMAN DECISIONS</p><h1>Decisions that need you</h1><p>Only exceptions outside automatic authority appear here. Evidence and customer impact are shown before you decide.</p></div></div>
             <div id="approval-list" class="approval-list"></div>
           </section>
 
@@ -163,6 +195,19 @@
         <div class="mode-choice"><label class="selected"><input type="radio" name="mode" value="execute" checked /><span><b>Execute within authority</b><small>Release safe plans automatically; route exceptions to people.</small></span></label><label><input type="radio" name="mode" value="recommend" /><span><b>Recommend only</b><small>Generate complete plans without operational mutation.</small></span></label></div>
         <div class="dialog-note"><b>Hard constraints remain enforced</b><span>Inventory, promise, safety, customs, and authorization are deterministic and cannot be overridden by agents.</span></div>
         <div class="dialog-actions"><button value="cancel" class="secondary-action">Cancel</button><button value="confirm" id="confirm-run" class="primary-action">Start orchestration <span>→</span></button></div>
+      </form>
+    </dialog>
+    <dialog id="tour-dialog">
+      <form method="dialog" class="tour-dialog">
+        <div class="dialog-head"><span class="dialog-icon">?</span><div><p class="eyebrow">60-SECOND ORIENTATION</p><h2>How to use PROJECT OVERSEER</h2></div><button value="cancel" aria-label="Close">×</button></div>
+        <div class="tour-steps">
+          <div><b>1</b><span><strong>Begin with Order Intake</strong><small>Select one, several, or all ten new orders. Each order remains independent.</small></span></div>
+          <div><b>2</b><span><strong>Run the agents</strong><small>Task capabilities gather facts, goal agents build a plan, and orchestration handles exceptions.</small></span></div>
+          <div><b>3</b><span><strong>Read the outcome summary</strong><small>The briefing shows savings, protected promises, automation, and the biggest problems.</small></span></div>
+          <div><b>4</b><span><strong>Decide only when needed</strong><small>Open Approval Queue for choices outside policy. Detailed evidence remains available in Live Runs and Audit Centre.</small></span></div>
+        </div>
+        <div class="dialog-note"><b>You cannot accidentally bypass a safety rule</b><span>Inventory integrity, customer promises, restrictions, and permissions remain deterministic hard controls.</span></div>
+        <div class="dialog-actions"><button value="cancel" class="secondary-action">Close</button><button value="start" class="primary-action">Start with Order Intake <span>→</span></button></div>
       </form>
     </dialog>
     <div id="toast" role="status" aria-live="polite"></div>
