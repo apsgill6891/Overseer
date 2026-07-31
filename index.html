@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1215" />
+    <meta
+      name="description"
+      content="PROJECT OVERSEER — an explainable agentic fulfillment control centre."
+    />
+    <title>PROJECT OVERSEER · FlowShip Fulfillment</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to operations</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div><strong>OVERSEER</strong><small>FLOW<span>SHIP</span></small></div>
+        </div>
+        <nav id="primary-nav">
+          <button class="nav-item active" data-view="command"><i>⌁</i><span>Command Centre</span></button>
+          <button class="nav-item" data-view="intake"><i>＋</i><span>Order Intake</span><b id="intake-count">10</b></button>
+          <button class="nav-item" data-view="runs"><i>↯</i><span>Live Runs</span><b id="run-count">0</b></button>
+          <button class="nav-item" data-view="orders"><i>▤</i><span>Orders</span></button>
+          <div class="nav-label">AGENT CONTROL</div>
+          <button class="nav-item" data-view="agents"><i>⌘</i><span>Agent Registry</span></button>
+          <button class="nav-item" data-view="goals"><i>◎</i><span>Goal Management</span></button>
+          <button class="nav-item" data-view="policy"><i>◇</i><span>Policy & Guardrails</span></button>
+          <div class="nav-label">GOVERNANCE</div>
+          <button class="nav-item" data-view="approvals"><i>✓</i><span>Approval Queue</span><b id="approval-count">0</b></button>
+          <button class="nav-item" data-view="audit"><i>≡</i><span>Audit Centre</span></button>
+        </nav>
+        <div class="system-card">
+          <div><span class="status-dot"></span><strong>All systems nominal</strong></div>
+          <p>Deterministic core · v1.0.0</p>
+        </div>
+        <button class="profile" id="profile-button">
+          <span class="avatar">AO</span>
+          <span><strong>Alex Ortega</strong><small>Orchestration Overseer</small></span>
+          <i>⌄</i>
+        </button>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="context"><span class="status-dot"></span><span>Simulation</span><b>Toronto · 14:32 EDT</b></div>
+          <div class="top-actions">
+            <button class="icon-button" id="reset-button" title="Reset simulation" aria-label="Reset simulation">↻</button>
+            <button class="icon-button" aria-label="Notifications">♢<span class="notification-dot"></span></button>
+          </div>
+        </header>
+
+        <main id="main">
+          <section class="view active" data-view-panel="command">
+            <div class="page-heading">
+              <div><p class="eyebrow">THURSDAY · JUL 30</p><h1>Command Centre</h1><p>Focus on what needs judgment. The network is otherwise operating normally.</p></div>
+              <button class="primary-action" data-go="intake">Review new orders <span>→</span></button>
+            </div>
+
+            <section class="attention-panel">
+              <div class="section-heading">
+                <div><span class="pulse-icon">!</span><div><h2>Needs your attention</h2><p>Exceptions and decisions ordered by operational urgency</p></div></div>
+                <span class="updated">Updated just now</span>
+              </div>
+              <div class="attention-grid">
+                <article class="attention-item amber">
+                  <div class="item-icon">↗</div><div><span class="tag">APPROVAL</span><h3>Air upgrade exceeds authority</h3><p>Order <b>FS-10428</b> · PulseTech · Prime</p><div class="impact"><span>Promise protected</span><b>+$41.80</b><span>cost impact</span></div></div>
+                  <button data-go="approvals">Review <span>→</span></button>
+                </article>
+                <article class="attention-item red">
+                  <div class="item-icon">!</div><div><span class="tag">DELIVERY RISK</span><h3>Carrier disruption on released order</h3><p>Order <b>FS-10421</b> · UPS Standard · In transit</p><div class="impact"><span>Recovery window</span><b>47 min</b><span>before risk increases</span></div></div>
+                  <button data-recovery>Start recovery <span>→</span></button>
+                </article>
+                <article class="attention-item blue">
+                  <div class="item-icon">◫</div><div><span class="tag">INVENTORY</span><h3>Network shortage needs resolution</h3><p>Order <b>FS-10425</b> · Northstar · 1 SKU short</p><div class="impact"><span>Potential transfer</span><b>YVR → YYZ</b><span>advisory only</span></div></div>
+                  <button data-go="orders">Investigate <span>→</span></button>
+                </article>
+              </div>
+            </section>
+
+            <div class="command-grid">
+              <section class="card network-card">
+                <div class="card-title"><div><h2>Network pulse</h2><p>Live operating conditions across FlowShip</p></div><span class="healthy">● HEALTHY</span></div>
+                <div class="facilities">
+                  <article><div class="fc-heading"><span>YYZ</span><div><strong>Toronto</strong><small>Ontario · EDT</small></div><b>72%</b></div><div class="meter"><i style="width:72%"></i></div><div class="fc-facts"><span><b>284</b> queued units</span><span>Ground cutoff <b>2h 28m</b></span></div></article>
+                  <article><div class="fc-heading"><span>YVR</span><div><strong>Vancouver</strong><small>British Columbia · PDT</small></div><b>54%</b></div><div class="meter"><i style="width:54%"></i></div><div class="fc-facts"><span><b>191</b> queued units</span><span>Ground cutoff <b>5h 58m</b></span></div></article>
+                  <article><div class="fc-heading"><span>CMH</span><div><strong>Columbus</strong><small>Ohio · EDT</small></div><b>63%</b></div><div class="meter"><i style="width:63%"></i></div><div class="fc-facts"><span><b>226</b> queued units</span><span>Ground cutoff <b>3h 28m</b></span></div></article>
+                </div>
+              </section>
+              <section class="card activity-card">
+                <div class="card-title"><div><h2>Agent activity</h2><p>Last 60 minutes</p></div><button data-go="runs">View runs</button></div>
+                <div class="activity-stats"><div><strong id="stat-completed">38</strong><span>Runs completed</span><small>↑ 12% vs prior hour</small></div><div><strong id="stat-auto">84%</strong><span>Auto-release rate</span><small>32 of 38 orders</small></div><div><strong>1.8s</strong><span>Median plan time</span><small>Within target</small></div></div>
+                <div class="agent-flow"><span><i class="orch">O</i> Orchestration</span><b>1 active</b><span><i class="goal">G</i> Goal agents</span><b>2 active</b><span><i class="task">T</i> Task agents</span><b>6 active</b></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="intake">
+            <div class="page-heading compact">
+              <div><p class="eyebrow">BATCH · INTAKE-0730-B</p><h1>Order Intake</h1><p>Ten intentionally varied orders are ready for orchestration.</p></div>
+              <div class="heading-actions"><button class="secondary-action" id="select-all">Select all</button><button class="primary-action" id="run-agents">Run agents <span>↯</span></button></div>
+            </div>
+            <div class="table-card">
+              <div class="table-tools"><label><input type="checkbox" id="master-check" /> <span id="selection-label">0 selected</span></label><div><span class="legend"><i class="det"></i> Deterministic core</span><span class="legend"><i class="human"></i> Human gate likely</span></div></div>
+              <div class="table-scroll"><table><thead><tr><th></th><th>Order</th><th>Merchant</th><th>Destination</th><th>Profile</th><th>Promise</th><th>Scenario signal</th><th>Status</th></tr></thead><tbody id="orders-body"></tbody></table></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="runs">
+            <div class="page-heading compact"><div><p class="eyebrow">EXECUTION MONITOR</p><h1>Live Runs</h1><p>Independent order lifecycles, coordinated through one auditable hierarchy.</p></div><span class="live-pill"><i></i> LIVE</span></div>
+            <div id="runs-empty" class="empty-state"><span>↯</span><h2>No agent runs yet</h2><p>Select orders from Order Intake and run the agents to observe execution.</p><button class="primary-action" data-go="intake">Go to Order Intake</button></div>
+            <div id="runs-layout" class="runs-layout hidden">
+              <div class="run-list" id="run-list"></div>
+              <div class="run-detail" id="run-detail"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="orders">
+            <div class="page-heading compact"><div><p class="eyebrow">OPERATIONS</p><h1>Orders</h1><p>Every fulfillment decision, allocation, and shipment in one lifecycle.</p></div></div>
+            <div class="table-card"><div class="table-tools"><label class="search">⌕ <input id="order-search" placeholder="Search order or merchant" /></label><div class="filter-pills"><button class="active">All</button><button>Exceptions</button><button>Released</button></div></div><div class="table-scroll"><table><thead><tr><th>Order</th><th>Merchant</th><th>Profile</th><th>Allocation</th><th>Carrier</th><th>Decision</th><th>Status</th></tr></thead><tbody id="all-orders-body"></tbody></table></div></div>
+          </section>
+
+          <section class="view" data-view-panel="agents">
+            <div class="page-heading compact"><div><p class="eyebrow">AGENT CONTROL</p><h1>Agent Registry</h1><p>Versioned capabilities with explicit execution types and authority boundaries.</p></div></div>
+            <div class="registry-grid" id="agent-grid"></div>
+          </section>
+
+          <section class="view" data-view-panel="goals">
+            <div class="page-heading compact"><div><p class="eyebrow">GOAL CONTROL</p><h1>Goal Management</h1><p>Bounded workflows that coordinate required checks toward operational outcomes.</p></div></div>
+            <div class="goal-columns" id="goal-columns"></div>
+          </section>
+
+          <section class="view" data-view-panel="policy">
+            <div class="page-heading compact"><div><p class="eyebrow">CONFIGURATION · VERSION 1.0</p><h1>Policy & Guardrails</h1><p>Published business authority that agents cannot silently weaken.</p></div><span class="published">✓ PUBLISHED</span></div>
+            <div class="policy-layout"><section class="card"><h2>Non-negotiable guardrails</h2><div class="guardrail-list" id="guardrail-list"></div></section><section class="card"><h2>Goal profiles</h2><div class="profile-list" id="profile-list"></div></section></div>
+          </section>
+
+          <section class="view" data-view-panel="approvals">
+            <div class="page-heading compact"><div><p class="eyebrow">HUMAN AUTHORITY</p><h1>Approval Queue</h1><p>Decisions outside automatic-release boundaries.</p></div></div>
+            <div id="approval-list" class="approval-list"></div>
+          </section>
+
+          <section class="view" data-view-panel="audit">
+            <div class="page-heading compact"><div><p class="eyebrow">IMMUTABLE HISTORY</p><h1>Audit Centre</h1><p>Structured evidence for every system, agent, policy, and human action.</p></div><span class="verified">◇ LEDGER VERIFIED</span></div>
+            <div class="audit-layout"><div class="audit-filters"><button class="active">All events</button><button>Decisions</button><button>Human actions</button><button>State changes</button></div><div class="timeline" id="audit-timeline"></div></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <dialog id="run-dialog">
+      <form method="dialog">
+        <div class="dialog-head"><span class="dialog-icon">↯</span><div><p class="eyebrow">EXECUTION CONFIRMATION</p><h2>Run fulfillment agents</h2></div><button value="cancel" aria-label="Close">×</button></div>
+        <p id="dialog-copy"></p>
+        <div class="mode-choice"><label class="selected"><input type="radio" name="mode" value="execute" checked /><span><b>Execute within authority</b><small>Release safe plans automatically; route exceptions to people.</small></span></label><label><input type="radio" name="mode" value="recommend" /><span><b>Recommend only</b><small>Generate complete plans without operational mutation.</small></span></label></div>
+        <div class="dialog-note"><b>Hard constraints remain enforced</b><span>Inventory, promise, safety, customs, and authorization are deterministic and cannot be overridden by agents.</span></div>
+        <div class="dialog-actions"><button value="cancel" class="secondary-action">Cancel</button><button value="confirm" id="confirm-run" class="primary-action">Start orchestration <span>→</span></button></div>
+      </form>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
